@@ -1,2 +1,3 @@
 # ftle
-Finite time Lyapunov exponents
+
+A package for computing Finite time Lyapunov exponents
