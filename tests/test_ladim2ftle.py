@@ -1,6 +1,7 @@
 import pytest
 import xarray as xr
 from ftle import ladim2ftle
+import numpy as np
 
 
 @pytest.fixture(scope='module')
@@ -9,11 +10,11 @@ def dset():
         data_vars=dict(
             particle_count=xr.Variable(
                 dims='time',
-                data=[4, 5],
+                data=[5, 4],
             ),
             pid=xr.Variable(
                 dims='particle_instance',
-                data=[0, 1, 2, 3, 0, 1, 2, 3, 4],
+                data=[0, 1, 2, 3, 4, 0, 1, 2, 3],
             ),
             release_time=xr.Variable(
                 dims='particle',
@@ -25,14 +26,32 @@ def dset():
             ),
             Y=xr.Variable(
                 dims='particle_instance',
-                data=[10, 20, 30, 40, 50, 60, 70, 80, 90],
+                data=[20, 20, 30, 40, 50, 60, 70, 80, 90],
             ),
         ),
     )
 
 
-class Test_get_original_position:
-    def test_returns_correct_xy_values(self, dset):
-        out = ladim2ftle.get_original_position(dset)
-        assert out.X.values.tolist() == [1, 2, 3, 4, 9]
-        assert out.Y.values.tolist() == [10, 20, 30, 40, 90]
+class Test_reorganize:
+    def test_has_correct_dimensions(self, dset):
+        out = ladim2ftle.reorganize(dset)
+        assert 'time' in set(out.dims)
+        assert 'X0' in set(out.dims)
+        assert 'Y0' in set(out.dims)
+
+    def test_has_organized_endpos_in_a_grid(self, dset):
+        out = ladim2ftle.reorganize(dset)
+        assert out.X.dims == ('Y0', 'X0')
+        assert out.Y.dims == ('Y0', 'X0')
+
+    def test_missing_grid_particles_are_negative(self, dset):
+        out = ladim2ftle.reorganize(dset)
+        assert (out.X.values < 0).astype(int).tolist() == [
+            [0, 0, 1, 1],
+            [1, 1, 0, 1],
+            [1, 1, 1, 0],
+        ]
+
+    def test_has_organized_pid_in_a_grid(self, dset):
+        out = ladim2ftle.reorganize(dset)
+        assert out.pid.dims == ('Y0', 'X0')
