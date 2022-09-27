@@ -56,9 +56,7 @@ class Test_reshape_by_coords:
 
     def test_has_correct_dimensions(self, stack_dset):
         out = ladim2ftle.reshape_by_coords(stack_dset)
-        assert 'time' in set(out.dims)
-        assert 'X0' in set(out.dims)
-        assert 'Y0' in set(out.dims)
+        assert out.dims == {'Y0': 3, 'X0': 4, 'time': 2}
 
     def test_has_organized_endpos_in_a_grid(self, stack_dset):
         out = ladim2ftle.reshape_by_coords(stack_dset)
