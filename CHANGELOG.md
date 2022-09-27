@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2]
 ### Fixed
-- Stupid error in script `ladim2alcs` that made it impossible to run 
+- Errors in script `ladim2alcs` that made it impossible to run on dedun 
 
 
 ## [1.1]

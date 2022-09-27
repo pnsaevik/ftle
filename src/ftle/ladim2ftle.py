@@ -173,7 +173,7 @@ def compute_neighbour_maxdist(grid_dset):
     dist2[3, 1:, :] = dist2_top_bot   # top
 
     # Find the maximal neighbour distance
-    dist_max = np.sqrt(np.nanmax(dist2, axis=0, initial=0))
+    dist_max = np.sqrt(np.max(np.nan_to_num(dist2), axis=0))
 
     attrs = dict(long_name='maximal distance to neighbouring points')
     if 'units' in grid_dset.X.attrs:
