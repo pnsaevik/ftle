@@ -47,12 +47,53 @@ def reshape_by_coords(stack_dset: xr.Dataset):
     ).set_index(
         indexes={'pid': ('Y0', 'X0')},
     ).unstack(
-        'pid', fill_value=-1,
+        'pid', fill_value=np.nan,
     ).assign_coords(
         time=stack_dset.time.isel(time=[0, -1])
     ).rename_vars(particle='pid')
 
     return dset_unstack
+
+
+def compute_neighbour_maxdist(grid_dset):
+    """
+    Compute max distance to neighbouring points
+    :param grid_dset: A gridded dataset
+    :return: The input dataset, but with appended variable `maxdist`
+    """
+    assert grid_dset.X.dims == ('Y0', 'X0')
+    assert grid_dset.Y.dims == ('Y0', 'X0')
+
+    # Extract coordinate values
+    xy = np.stack([grid_dset.X.values, grid_dset.Y.values])
+
+    # Compute squared distance between points
+    dist2_lft_rgt = np.sum((xy[:, :, 1:] - xy[:, :, :-1])**2, axis=0)
+    dist2_top_bot = np.sum((xy[:, 1:, :] - xy[:, :-1, :])**2, axis=0)
+
+    # Compute squared distance to neighbour points
+    dist2 = np.empty((4,) + grid_dset.X.shape, dtype=xy.dtype)
+    dist2[:, :, [0, -1]] = np.nan
+    dist2[:, [0, -1], :] = np.nan
+    dist2[0, :, :-1] = dist2_lft_rgt  # right
+    dist2[1, :, 1:] = dist2_lft_rgt   # left
+    dist2[2, :-1, :] = dist2_top_bot  # bottom
+    dist2[3, 1:, :] = dist2_top_bot   # top
+
+    # Find the maximal neighbour distance
+    dist_max = np.sqrt(np.nanmax(dist2, axis=0, initial=0))
+
+    attrs = dict(long_name='maximal distance to neighbouring points')
+    if 'units' in grid_dset.X.attrs:
+        attrs['units'] = grid_dset.X.attrs['units']
+
+    return grid_dset.assign(
+        maxdist=xr.Variable(
+            dims=grid_dset.X.dims,
+            data=dist_max,
+            attrs=attrs,
+        ),
+    )
 
 
 def main(infile, outfile):
