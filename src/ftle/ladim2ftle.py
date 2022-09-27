@@ -224,11 +224,5 @@ def init_logger():
 
 if __name__ == '__main__':
     import sys
-
-    argv = [
-        r"--nk800=S:\scratch\jonal\work_lyapunov\ladim\norkyst_800m_grid.nc",
-        r"C:\Users\a5606\AppData\Local\Temp\out.nc",
-        r"S:\scratch\jonal\work_lyapunov\ladim\NK800_2*m.nc",
-    ]
-
+    argv = sys.argv[1:]
     main(*argv)
