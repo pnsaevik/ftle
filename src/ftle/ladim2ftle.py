@@ -10,11 +10,11 @@ def run(ladim_dset):
     return xr.Dataset()
 
 
-def reorganize(ladim_dset: xr.Dataset):
+def stack_by_time(ladim_dset: xr.Dataset):
     """
     Reorganize the dataset by start/stop position
-    :param ladim_dset:
-    :return:
+    :param ladim_dset: A ladim dataset
+    :return: A dataset stacked by time
     """
 
     # Simplify input dataset
@@ -26,19 +26,30 @@ def reorganize(ladim_dset: xr.Dataset):
     dset1 = dset.isel(pid=slice(-count[-1], None), time=[-1])
 
     # Combine start and stop positions into a multidimensional array
-    dset_con = xr.concat(objs=[dset0, dset1], dim='time', join='inner')
+    return xr.concat(objs=[dset0, dset1], dim='time', join='inner')
+
+
+def reshape_by_coords(stack_dset: xr.Dataset):
+    """
+    Reshape the dataset by the gridded coordinates of the original positions
+    :param stack_dset: A dataset stacked by time
+    :return: A gridded dataset
+    """
+
+    dset0 = stack_dset.isel(time=0)
+    dset1 = stack_dset.isel(time=-1)
 
     # Reindex dset1 by the position of origin (X0, Y0)
     dset_unstack = dset1.assign(
-        X0=dset_con.X.isel(time=0).astype('i4'),
-        Y0=dset_con.Y.isel(time=0).astype('i4'),
+        X0=dset0.X,
+        Y0=dset0.Y,
         particle=xr.Variable(dims='pid', data=dset1.pid.values),
     ).set_index(
         indexes={'pid': ('Y0', 'X0')},
     ).unstack(
         'pid', fill_value=-1,
-    ).drop_dims('time').assign_coords(
-        time=dset_con.time.isel(time=[0, -1])
+    ).assign_coords(
+        time=stack_dset.time.isel(time=[0, -1])
     ).rename_vars(particle='pid')
 
     return dset_unstack
