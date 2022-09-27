@@ -5,7 +5,7 @@ import numpy as np
 
 
 @pytest.fixture(scope='module')
-def dset():
+def ladim_dset():
     return xr.Dataset(
         coords=dict(
             time=xr.Variable(
@@ -38,39 +38,40 @@ def dset():
     )
 
 
+@pytest.fixture(scope='module')
+def stack_dset(ladim_dset):
+    return ladim2ftle.stack_by_time(ladim_dset)
+
+
+@pytest.fixture(scope='module')
+def grid_dset(stack_dset):
+    return ladim2ftle.reshape_by_coords(stack_dset)
+
+
 class Test_stack_by_time:
-    def test_returns_reorganized_dataset(self, dset):
-        out = ladim2ftle.stack_by_time(dset)
-        assert out.dims == {'pid': 4, 'time': 2}
-        assert out.time.dims == ('time', )
-        assert out.pid.dims == ('pid',)
-        assert out.X.dims == ('time', 'pid')
-        assert out.Y.dims == ('time', 'pid')
-        assert out.particle_count.dims == ('time', )
+    def test_returns_reorganized_dataset(self, stack_dset):
+        assert stack_dset.dims == {'pid': 4, 'time': 2}
+        assert stack_dset.time.dims == ('time', )
+        assert stack_dset.pid.dims == ('pid',)
+        assert stack_dset.X.dims == ('time', 'pid')
+        assert stack_dset.Y.dims == ('time', 'pid')
+        assert stack_dset.particle_count.dims == ('time', )
 
 
 class Test_reshape_by_coords:
-    @pytest.fixture(scope='class')
-    def stack_dset(self, dset):
-        return ladim2ftle.stack_by_time(dset)
+    def test_has_correct_dimensions(self, grid_dset):
+        assert grid_dset.dims == {'Y0': 3, 'X0': 4, 'time': 2}
 
-    def test_has_correct_dimensions(self, stack_dset):
-        out = ladim2ftle.reshape_by_coords(stack_dset)
-        assert out.dims == {'Y0': 3, 'X0': 4, 'time': 2}
+    def test_has_organized_endpos_in_a_grid(self, grid_dset):
+        assert grid_dset.X.dims == ('Y0', 'X0')
+        assert grid_dset.Y.dims == ('Y0', 'X0')
 
-    def test_has_organized_endpos_in_a_grid(self, stack_dset):
-        out = ladim2ftle.reshape_by_coords(stack_dset)
-        assert out.X.dims == ('Y0', 'X0')
-        assert out.Y.dims == ('Y0', 'X0')
-
-    def test_missing_grid_particles_are_negative(self, stack_dset):
-        out = ladim2ftle.reshape_by_coords(stack_dset)
-        assert (out.X.values < 0).astype(int).tolist() == [
+    def test_missing_grid_particles_are_negative(self, grid_dset):
+        assert (grid_dset.X.values < 0).astype(int).tolist() == [
             [0, 0, 1, 1],
             [1, 1, 0, 1],
             [1, 1, 1, 0],
         ]
 
-    def test_has_organized_pid_in_a_grid(self, stack_dset):
-        out = ladim2ftle.reshape_by_coords(stack_dset)
-        assert out.pid.dims == ('Y0', 'X0')
+    def test_has_organized_pid_in_a_grid(self, grid_dset):
+        assert grid_dset.pid.dims == ('Y0', 'X0')
