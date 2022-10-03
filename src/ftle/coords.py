@@ -1,4 +1,5 @@
 import pyproj
+from scipy.ndimage import map_coordinates
 
 
 def named_crs(name):
@@ -24,3 +25,42 @@ def named_crs(name):
         return pyproj.CRS.from_proj4(proj_strings[name.lower()])
     else:
         return pyproj.CRS.from_user_input(name)
+
+
+class VertCRS:
+    def __init__(self):
+        pass
+
+    def depth(self, x, y, z):
+        """
+        Returns the depth (nonnegative, in meters) at the given grid coordinates
+        """
+        raise NotImplementedError()
+
+    def z(self, x, y, depth):
+        """
+        Returns the vertical coordinate at the given depth and horizontal coordinates
+        """
+        raise NotImplementedError()
+
+
+class ArrayVertCRS(VertCRS):
+    """
+    A vertical coordinate system based on a depth array.
+    """
+
+    def __init__(self, depth):
+        """
+        Returns a vertical coordinate system based on a depth array.
+
+        The depth array is a 3-dimensional array where the first axis is the vertical
+        axis and the remaining ones are the horizontal axes.
+
+        :param depth: The depth of each grid point (nonnegative), in meters
+        """
+        self._depth = depth
+        super().__init__()
+
+    def depth(self, x, y, z):
+        return map_coordinates(self._depth, [z, y, x], order=1)
+
