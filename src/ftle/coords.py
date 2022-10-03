@@ -64,3 +64,16 @@ class ArrayVertCRS(VertCRS):
     def depth(self, x, y, z):
         return map_coordinates(self._depth, [z, y, x], order=1)
 
+
+
+def searchsorted(a, v, crd=None, side='left'):
+    if crd is None:
+        b = a[:, np.newaxis]
+    else:
+        b = a[(slice(None), ) + tuple(crd)]
+
+    operator = dict(left=np.less, right=np.less_equal)[side]
+
+    return operator(b, v).sum(axis=0)
+
+

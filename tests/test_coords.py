@@ -33,3 +33,35 @@ class Test_ArrayVertCRS_depth:
         d = crs.depth(x=[0, 0.5, 0, 0], y=[0, 0, 0.5, 0], z=[0, 0, 0, .5])
         assert d.tolist() == [12.0, 12.5, 14.0, 6.0]
 
+
+class Test_searchsorted:
+    def test_matches_numpy_for_onedim_increasing_array(self):
+        a = np.array([0, 1, 5, 10, 50, 100])
+        v = [-1, 0, .5, 1, 1.5, 100, 101]
+        np_result = np.searchsorted(a, v)
+        result = coords.searchsorted(a, v)
+        assert result.tolist() == np_result.tolist()
+
+    def test_matches_numpy_for_onedim_increasing_array_if_side_right(self):
+        a = np.array([0, 1, 5, 10, 50, 100])
+        v = [-1, 0, .5, 1, 1.5, 100, 101]
+        np_result = np.searchsorted(a, v, side='right')
+        result = coords.searchsorted(a, v, side='right')
+        assert result.tolist() == np_result.tolist()
+
+    def test_matches_numpy_for_twodim_increasing_array(self):
+        a = np.array([
+            [0, 1, 5, 10, 50, 100],
+            [1000, 1001, 1005, 1010, 1050, 1100],
+        ]).T
+        v = np.array([
+            [-1, 0, .5, 1, 2, 100, 101],
+            [999, 1000, 1000.5, 1001, 1002, 1100, 1101],
+        ])
+        i = np.array([[0] * 7, [1] * 7])
+        np_result_0 = np.searchsorted(a[:, 0], v[0])
+        np_result_1 = np.searchsorted(a[:, 1], v[1])
+        result = coords.searchsorted(a, v.ravel(), [i.ravel()])
+        assert result.tolist() == np_result_0.tolist() + np_result_1.tolist()
+
+
