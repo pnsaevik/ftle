@@ -54,9 +54,10 @@ class ArrayVertCRS(VertCRS):
         Returns a vertical coordinate system based on a depth array.
 
         The depth array is a 3-dimensional array where the first axis is the vertical
-        axis and the remaining ones are the horizontal axes.
+        axis and the remaining ones are the horizontal axes. The array should be
+        organized so that depth[k, j, i] < depth[k + 1, j, i] <= 0 for all i, j, k.
 
-        :param depth: The depth of each grid point (nonnegative), in meters
+        :param depth: Depth in meters
         """
         self._depth = depth
         super().__init__()
@@ -64,6 +65,21 @@ class ArrayVertCRS(VertCRS):
     def depth(self, x, y, z):
         return map_coordinates(self._depth, [z, y, x], order=1)
 
+    def z(self, x, y, depth):
+        kmax = self._depth.shape[0]  # Number of vertical levels
+        z = np.arange(kmax)
+
+        shape = (len(z), np.size(x))
+        xx = np.broadcast_to(x.ravel(), shape)
+        yy = np.broadcast_to(y.ravel(), shape)
+        zz = np.broadcast_to(z[:, np.newaxis], shape)
+
+        d = map_coordinates(self._depth, [zz, yy, xx], order=1)
+        k = np.less(d, depth).sum(axis=0)
+        depth_0 = self.depth(x, y, k - 1)
+        depth_1 = self.depth(x, y, k)
+
+        return k - (depth_1 - depth) / (depth_1 - depth_0)
 
 
 def searchsorted(a, v, crd=None, side='left'):
