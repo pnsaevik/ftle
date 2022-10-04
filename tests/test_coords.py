@@ -20,6 +20,21 @@ class Test_named_crs:
             assert isinstance(crs, pyproj.CRS)
 
 
+class Test_bilin_inv:
+    def test_can_retrieve_coordinates(self):
+        y, x = np.meshgrid(np.arange(4), np.arange(5), indexing='ij')
+        u = x + y
+        v = x - y
+        i = np.array([0, 1, 4])
+        j = np.array([0, 0, 3])
+        u_ji = u[j, i]
+        v_ji = v[j, i]
+
+        j2, i2 = coords.bilin_inv(u_ji, v_ji, u, v)
+        assert j2.tolist() == j.tolist()
+        assert i2.tolist() == i.tolist()
+
+
 class Test_ArrayVertCRS_depth:
     def test_can_interpolate(self):
         depth_array = -24 + np.arange(24, dtype='f4').reshape((2, 3, 4))
