@@ -30,26 +30,26 @@ def named_crs(name):
 
 
 class TimeCRS:
-    def posix(self, t):
+    def posix(self, x, y, z, t):
         raise NotImplementedError()
 
-    def t(self, posix):
+    def t(self, x, y, z, posix):
         raise NotImplementedError()
 
-    def to_array(self, t):
+    def to_array(self, x, y, z, t):
         epoch = np.datetime64('1970-01-01', 'us')
         one_sec = np.timedelta64(1000000, 'us')
-        return epoch + self.posix(t) * one_sec
+        return epoch + self.posix(x, y, z, t) * one_sec
 
 
 class PlainTimeCRS(TimeCRS):
     def __init__(self):
         super().__init__()
 
-    def posix(self, t):
+    def posix(self, x, y, z, t):
         return t
 
-    def t(self, posix):
+    def t(self, x, y, z, posix):
         return posix
 
 
@@ -59,7 +59,7 @@ class CFTimeCRS(TimeCRS):
         self.units = units
         self.calendar = calendar
 
-    def posix(self, t):
+    def posix(self, x, y, z, t):
         import cftime
         pydates = cftime.num2date(
             times=t,
@@ -73,7 +73,7 @@ class CFTimeCRS(TimeCRS):
         one_sec = np.timedelta64(1000000, 'us')
         return (npdates - epoch) / one_sec
 
-    def t(self, posix):
+    def t(self, x, y, z, posix):
         epoch = np.datetime64('1970-01-01', 'us')
         one_sec = np.timedelta64(1000000, 'us')
         npdates = (one_sec * posix).astype('timedelta64[us]') + epoch
@@ -85,13 +85,13 @@ class VertCRS:
     def __init__(self):
         pass
 
-    def depth(self, x, y, z):
+    def depth(self, x, y, z, t):
         """
         Returns the depth (nonnegative, in meters) at the given grid coordinates
         """
         raise NotImplementedError()
 
-    def z(self, x, y, depth):
+    def z(self, x, y, depth, t):
         """
         Returns the vertical coordinate at the given depth and horizontal coordinates
         """
@@ -131,11 +131,11 @@ class ArrayVertCRS(VertCRS):
     def _get_depth_from_xyk(self, x, y, k):
         return map_coordinates(self._depth, [k, y, x], order=1)
 
-    def depth(self, x, y, z):
+    def depth(self, x, y, z, t):
         k = self._get_k_from_z(z)
         return self._get_depth_from_xyk(x, y, k)
 
-    def z(self, x, y, depth):
+    def z(self, x, y, depth, t):
         kmax = self._depth.shape[0]  # Number of vertical levels
 
         shape = (kmax, np.size(x))
@@ -162,5 +162,77 @@ def searchsorted(a, v, crd=None, side='left'):
     operator = dict(left=np.less, right=np.less_equal)[side]
 
     return operator(b, v).sum(axis=0)
+
+
+class PlainVertCRS(VertCRS):
+    def __init__(self):
+        super().__init__()
+
+    def depth(self, x, y, z, t):
+        return z
+
+    def z(self, x, y, depth, t):
+        return depth
+
+
+class FourDimCRS:
+    def __init__(self, horz_crs: pyproj.CRS, vert_crs: VertCRS, time_crs: TimeCRS):
+        self.horz_crs = horz_crs
+        self.vert_crs = vert_crs
+        self.time_crs = time_crs
+        self.posix = self.time_crs.posix
+        self.t = self.time_crs.t
+        self.depth = self.vert_crs.depth
+        self.z = self.vert_crs.z
+        self._latlon_transform = None
+
+    def _get_latlon_transform(self):
+        if self._latlon_transform is None:
+            wgs84 = pyproj.CRS.from_epsg(4326)
+            self._latlon_transform = pyproj.Transformer.from_crs(self.horz_crs, wgs84)
+        return self._latlon_transform
+
+    # noinspection PyUnusedLocal
+    def xy(self, lat, lon, z, t):
+        from pyproj.enums import TransformDirection
+        transform = self._get_latlon_transform().transform
+        return transform(lat, lon, direction=TransformDirection('INVERSE'))
+
+    # noinspection PyUnusedLocal
+    def latlon(self, x, y, z, t):
+        transform = self._get_latlon_transform().transform
+        return transform(x, y)
+
+
+class FourDimTransform:
+    def __init__(self, crs_from: FourDimCRS, crs_to: FourDimCRS):
+        self.crs_from = crs_from
+        self.crs_to = crs_to
+        self.horz_transform = pyproj.Transformer.from_crs(
+            crs_from.horz_crs, crs_to.horz_crs,
+        )
+
+    def transform(self, xx, yy, zz, tt):
+        # Horizontal coordinates
+        if self.crs_from.horz_crs is self.crs_to.horz_crs:
+            x2, y2 = xx, yy
+        else:
+            x2, y2 = self.horz_transform.transform(xx, yy)
+
+        # Vertical coordinates
+        if self.crs_from.vert_crs is self.crs_to.vert_crs:
+            z2 = zz
+        else:
+            depth = self.crs_from.depth(xx, yy, zz, tt)
+            z2 = self.crs_to.z(xx, yy, depth, tt)
+
+        # Time coordinates
+        if self.crs_from.time_crs is self.crs_to.time_crs:
+            t2 = tt
+        else:
+            t_posix = self.crs_from.posix(xx, yy, zz, tt)
+            t2 = self.crs_to.t(xx, yy, zz, t_posix)
+
+        return x2, y2, z2, t2
 
 
