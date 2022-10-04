@@ -114,6 +114,32 @@ class PlainHorzCRS(HorzCRS):
         return lat, lon
 
 
+class ArrayHorzCRS(HorzCRS):
+    """A horizontal coordinate system based on a set of lat/lon arrays"""
+    def __init__(self, lat, lon):
+        """
+        Returns a horizontal coordinate system based on a set of lat/lon arrays
+
+        The lat/lon arrays are 2-dimensional arrays where the first axis is the y
+        coordinate and the second one is the x coordinate.
+
+        :param lat: The latitude of each grid point (y, x)
+        :param lon: The longitude of each grid point (y, x)
+        """
+        super().__init__()
+        self.lat = lat
+        self.lon = lon
+
+    def latlon(self, x, y, z, t):
+        lat = map_coordinates(self.lat, [y, x], order=1)
+        lon = map_coordinates(self.lon, [y, x], order=1)
+        return lat, lon
+
+    def xy(self, lat, lon, z, t):
+        y, x = bilin_inv(lat, lon, self.lat, self.lon)
+        return x, y
+
+
 class PyprojHorzCRS(HorzCRS):
     def __init__(self, crs):
         super().__init__()

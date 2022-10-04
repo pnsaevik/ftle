@@ -35,6 +35,34 @@ class Test_bilin_inv:
         assert i2.tolist() == i.tolist()
 
 
+class Test_ArrayHorzCRS:
+    def test_can_return_latlon(self):
+        y, x = np.meshgrid(np.arange(4), np.arange(5), indexing='ij')
+        lat = x + y
+        lon = x - y
+        i = np.array([0, 1, 4])
+        j = np.array([0, 0, 3])
+
+        crs = coords.ArrayHorzCRS(lat, lon)
+        lat_ji, lon_ji = crs.latlon(i, j, None, None)
+        assert lat_ji.tolist() == (i + j).tolist()
+        assert lon_ji.tolist() == (i - j).tolist()
+
+    def test_can_return_xy(self):
+        y, x = np.meshgrid(np.arange(4), np.arange(5), indexing='ij')
+        lat = x + y
+        lon = x - y
+        i = np.array([0, 1, 4])
+        j = np.array([0, 0, 3])
+        lat_ji = lat[j, i]
+        lon_ji = lon[j, i]
+
+        crs = coords.ArrayHorzCRS(lat, lon)
+        i2, j2 = crs.xy(lat_ji, lon_ji, None, None)
+        assert i2.tolist() == i.tolist()
+        assert j2.tolist() == j.tolist()
+
+
 class Test_ArrayVertCRS_depth:
     def test_can_interpolate(self):
         depth_array = -24 + np.arange(24, dtype='f4').reshape((2, 3, 4))
