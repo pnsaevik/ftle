@@ -22,29 +22,39 @@ class Test_named_crs:
 class Test_ArrayVertCRS_depth:
     def test_can_interpolate(self):
         depth_array = -24 + np.arange(24, dtype='f4').reshape((2, 3, 4))
-        crs = coords.ArrayVertCRS(depth_array)
-        d = crs.depth(x=[0, 0.5, 0, 0], y=[0, 0, 0.5, 0], z=[0, 0, 0, .5])
+        z_coord = np.array([0, 1000])
+        crs = coords.ArrayVertCRS(depth_array, z_coord)
+        d = crs.depth(x=[0, 0.5, 0, 0], y=[0, 0, 0.5, 0], z=[0, 0, 0, 500])
         assert d.tolist() == [-24, -23.5, -22, -18]
+
+    def test_extrapolates_constant_value(self):
+        depth_array = np.array([-4, -3, -2, -1, 0]).reshape((-1, 1, 1))
+        z_coord = np.arange(depth_array.size)
+        crs = coords.ArrayVertCRS(depth_array, z_coord)
+        d = crs.depth(x=[0, 0, 0, 0], y=[0, 0, 0, 0], z=[0, 1, -1, 6])
+        assert d.tolist() == [-4, -3, -4, 0]
 
 
 class Test_ArrayVertCRS_z:
     def test_can_return_fractional_z_values(self):
         depth_array = np.array([-24, -16, -8]).reshape((3, 1, 1))
-        crs = coords.ArrayVertCRS(depth_array)
+        z_coord = np.array([0., 1000., 2000.])
+        crs = coords.ArrayVertCRS(depth_array, z_coord)
         x = np.array([0, 0, 0, 0, 0])
         y = np.array([0, 0, 0, 0, 0])
         depth = -np.array([24, 22, 20, 16, 12])
         z = crs.z(x=x, y=y, depth=depth)
-        assert z.tolist() == [0, .25, .5, 1, 1.5]
+        assert z.tolist() == [0, 250, 500, 1000, 1500]
 
     def test_can_interpolate_fractional_xy_values(self):
         depth_array = -16 + np.arange(16, dtype='f4').reshape((2, 2, 4))
-        crs = coords.ArrayVertCRS(depth_array)
+        z_coord = np.array([0., 1000.])
+        crs = coords.ArrayVertCRS(depth_array, z_coord)
         x = np.array([0, 0, 0, 0, 0])
         y = np.array([0, 0.25, 0.5, 0.75, 1])  # maxdepth goes from -8 to -16
         depth = -np.array([8, 8, 8, 8, 8])
         z = crs.z(x=x, y=y, depth=depth)
-        assert z.tolist() == [1, .875, .75, .625, .5]
+        assert z.tolist() == [1000, 875, 750, 625, 500]
 
 
 class Test_searchsorted:

@@ -1,5 +1,6 @@
 import pyproj
 from scipy.ndimage import map_coordinates
+import numpy as np
 
 
 def named_crs(name):
@@ -49,7 +50,7 @@ class ArrayVertCRS(VertCRS):
     A vertical coordinate system based on a depth array.
     """
 
-    def __init__(self, depth):
+    def __init__(self, depth, z):
         """
         Returns a vertical coordinate system based on a depth array.
 
@@ -57,29 +58,46 @@ class ArrayVertCRS(VertCRS):
         axis and the remaining ones are the horizontal axes. The array should be
         organized so that depth[k, j, i] < depth[k + 1, j, i] <= 0 for all i, j, k.
 
+        The z array is a 1-dimensional array (matching axis 0 of the depth array)
+        containing the vertical coordinates for each depth level.
+
         :param depth: Depth in meters
+        :param z: Vertical coordinate for each depth level
         """
         self._depth = depth
+        self._zcoord = z
         super().__init__()
 
+    def _get_k_from_z(self, z):
+        kcoord = np.arange(len(self._zcoord))
+        return np.interp(z, self._zcoord, kcoord)
+
+    def _get_z_from_k(self, k):
+        return map_coordinates(self._zcoord, [k], order=1)
+
+    def _get_depth_from_xyk(self, x, y, k):
+        return map_coordinates(self._depth, [k, y, x], order=1)
+
     def depth(self, x, y, z):
-        return map_coordinates(self._depth, [z, y, x], order=1)
+        k = self._get_k_from_z(z)
+        return self._get_depth_from_xyk(x, y, k)
 
     def z(self, x, y, depth):
         kmax = self._depth.shape[0]  # Number of vertical levels
-        z = np.arange(kmax)
 
-        shape = (len(z), np.size(x))
+        shape = (kmax, np.size(x))
         xx = np.broadcast_to(x.ravel(), shape)
         yy = np.broadcast_to(y.ravel(), shape)
-        zz = np.broadcast_to(z[:, np.newaxis], shape)
+        kk = np.broadcast_to(np.arange(kmax)[:, np.newaxis], shape)
 
-        d = map_coordinates(self._depth, [zz, yy, xx], order=1)
-        k = np.less(d, depth).sum(axis=0)
-        depth_0 = self.depth(x, y, k - 1)
-        depth_1 = self.depth(x, y, k)
+        d = map_coordinates(self._depth, [kk, yy, xx], order=1)
+        k_int = np.less(d, depth).sum(axis=0)
+        k_int = np.maximum(np.minimum(k_int, kmax - 1), 1)
+        depth_0 = self._get_depth_from_xyk(x, y, k_int - 1)
+        depth_1 = self._get_depth_from_xyk(x, y, k_int)
 
-        return k - (depth_1 - depth) / (depth_1 - depth_0)
+        k_float = k_int - (depth_1 - depth) / (depth_1 - depth_0)
+        return self._get_z_from_k(k_float)
 
 
 def searchsorted(a, v, crd=None, side='left'):
