@@ -86,3 +86,22 @@ class Test_searchsorted:
         np_result_1 = np.searchsorted(a[:, 1], v[1])
         result = coords.searchsorted(a, v.ravel(), [i.ravel()])
         assert result.tolist() == np_result_0.tolist() + np_result_1.tolist()
+
+
+class Test_CFTimeCRS:
+    def test_can_compute_posix_time(self):
+        crs = coords.CFTimeCRS(units='hours since 1970-01-01 01:00:00')
+        t = np.array([-1, 0, 1, 2])
+        assert crs.posix(t).tolist() == [0, 3600, 7200, 10800]
+
+    def test_can_compute_reference_time(self):
+        crs = coords.CFTimeCRS(units='hours since 1970-01-01 01:00:00')
+        posix = np.array([0, 3600, 7200, 10800])
+        assert crs.t(posix).tolist() == [-1, 0, 1, 2]
+
+    def test_can_compute_numpy_time(self):
+        crs = coords.CFTimeCRS(units='hours since 1970-01-01 01:00:00')
+        t = np.array([-1, 0, 1, 2])
+        assert crs.to_array(t).astype('datetime64[h]').astype(str).tolist() == [
+            '1970-01-01T00', '1970-01-01T01', '1970-01-01T02', '1970-01-01T03',
+        ]

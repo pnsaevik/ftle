@@ -1,3 +1,4 @@
+import cftime
 import pyproj
 from scipy.ndimage import map_coordinates
 import numpy as np
@@ -26,6 +27,58 @@ def named_crs(name):
         return pyproj.CRS.from_proj4(proj_strings[name.lower()])
     else:
         return pyproj.CRS.from_user_input(name)
+
+
+class TimeCRS:
+    def posix(self, t):
+        raise NotImplementedError()
+
+    def t(self, posix):
+        raise NotImplementedError()
+
+    def to_array(self, t):
+        epoch = np.datetime64('1970-01-01', 'us')
+        one_sec = np.timedelta64(1000000, 'us')
+        return epoch + self.posix(t) * one_sec
+
+
+class PlainTimeCRS(TimeCRS):
+    def __init__(self):
+        super().__init__()
+
+    def posix(self, t):
+        return t
+
+    def t(self, posix):
+        return posix
+
+
+class CFTimeCRS(TimeCRS):
+    def __init__(self, units, calendar="standard"):
+        super().__init__()
+        self.units = units
+        self.calendar = calendar
+
+    def posix(self, t):
+        import cftime
+        pydates = cftime.num2date(
+            times=t,
+            units=self.units,
+            calendar=self.calendar,
+            only_use_python_datetimes=True,
+            only_use_cftime_datetimes=False,
+        )
+        npdates = np.array(pydates).astype('datetime64[us]')
+        epoch = np.datetime64('1970-01-01', 'us')
+        one_sec = np.timedelta64(1000000, 'us')
+        return (npdates - epoch) / one_sec
+
+    def t(self, posix):
+        epoch = np.datetime64('1970-01-01', 'us')
+        one_sec = np.timedelta64(1000000, 'us')
+        npdates = (one_sec * posix).astype('timedelta64[us]') + epoch
+        pydates = npdates.astype(object)
+        return cftime.date2num(dates=pydates, units=self.units, calendar=self.calendar)
 
 
 class VertCRS:
