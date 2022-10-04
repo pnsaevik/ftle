@@ -1,3 +1,4 @@
+import pytest
 from ftle import coords
 import pyproj
 import numpy as np
@@ -112,8 +113,8 @@ class Test_FourDimTransform:
         plain_time_crs = coords.PlainTimeCRS()
         plain_vert_crs = coords.PlainVertCRS()
 
-        wgs84 = pyproj.CRS.from_epsg(4326)
-        mercator = pyproj.CRS.from_epsg(3395)
+        wgs84 = coords.PlainHorzCRS()
+        mercator = coords.HorzCRS.from_name(3395)
 
         wgs84_4d = coords.FourDimCRS(wgs84, plain_vert_crs, plain_time_crs)
         mercator_4d = coords.FourDimCRS(mercator, plain_vert_crs, plain_time_crs)
@@ -132,7 +133,7 @@ class Test_FourDimTransform:
         assert t2.tolist() == t.tolist()
 
     def test_correct_when_only_time_transform(self):
-        wgs84 = pyproj.CRS.from_epsg(4326)
+        wgs84 = coords.PlainHorzCRS()
         plain_vert_crs = coords.PlainVertCRS()
 
         time_crs_1 = coords.CFTimeCRS('hours since 1970-01-01 01:00:00')
@@ -155,7 +156,7 @@ class Test_FourDimTransform:
         assert t2.tolist() == [-3600, 0, 3600]
 
     def test_correct_when_only_vert_transform(self):
-        wgs84 = pyproj.CRS.from_epsg(4326)
+        wgs84 = coords.PlainHorzCRS()
         plain_time_crs = coords.PlainTimeCRS()
 
         vert_crs_1 = coords.ArrayVertCRS(

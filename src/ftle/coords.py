@@ -29,6 +29,54 @@ def named_crs(name):
         return pyproj.CRS.from_user_input(name)
 
 
+class HorzCRS:
+    def __init__(self):
+        pass
+
+    def xy(self, lat, lon, z, t):
+        raise NotImplementedError()
+
+    def latlon(self, x, y, z, t):
+        raise NotImplementedError()
+
+    @staticmethod
+    def from_name(name):
+        return PyprojHorzCRS(named_crs(name))
+
+
+class PlainHorzCRS(HorzCRS):
+    def __init__(self):
+        super().__init__()
+
+    def latlon(self, x, y, z, t):
+        return x, y
+
+    def xy(self, lat, lon, z, t):
+        return lat, lon
+
+
+class PyprojHorzCRS(HorzCRS):
+    def __init__(self, crs):
+        super().__init__()
+        self.crs = crs
+        self._latlon_transform = None
+
+    def _get_latlon_transform(self):
+        if self._latlon_transform is None:
+            wgs84 = pyproj.CRS.from_epsg(4326)
+            self._latlon_transform = pyproj.Transformer.from_crs(self.crs, wgs84)
+        return self._latlon_transform
+
+    def xy(self, lat, lon, z, t):
+        from pyproj.enums import TransformDirection
+        transform = self._get_latlon_transform().transform
+        return transform(lat, lon, direction=TransformDirection('INVERSE'))
+
+    def latlon(self, x, y, z, t):
+        transform = self._get_latlon_transform().transform
+        return transform(x, y)
+
+
 class TimeCRS:
     def posix(self, x, y, z, t):
         raise NotImplementedError()
@@ -176,7 +224,7 @@ class PlainVertCRS(VertCRS):
 
 
 class FourDimCRS:
-    def __init__(self, horz_crs: pyproj.CRS, vert_crs: VertCRS, time_crs: TimeCRS):
+    def __init__(self, horz_crs: HorzCRS, vert_crs: VertCRS, time_crs: TimeCRS):
         self.horz_crs = horz_crs
         self.vert_crs = vert_crs
         self.time_crs = time_crs
@@ -184,40 +232,23 @@ class FourDimCRS:
         self.t = self.time_crs.t
         self.depth = self.vert_crs.depth
         self.z = self.vert_crs.z
-        self._latlon_transform = None
+        self.xy = self.horz_crs.xy
+        self.latlon = self.horz_crs.latlon
 
-    def _get_latlon_transform(self):
-        if self._latlon_transform is None:
-            wgs84 = pyproj.CRS.from_epsg(4326)
-            self._latlon_transform = pyproj.Transformer.from_crs(self.horz_crs, wgs84)
-        return self._latlon_transform
-
-    # noinspection PyUnusedLocal
-    def xy(self, lat, lon, z, t):
-        from pyproj.enums import TransformDirection
-        transform = self._get_latlon_transform().transform
-        return transform(lat, lon, direction=TransformDirection('INVERSE'))
-
-    # noinspection PyUnusedLocal
-    def latlon(self, x, y, z, t):
-        transform = self._get_latlon_transform().transform
-        return transform(x, y)
 
 
 class FourDimTransform:
     def __init__(self, crs_from: FourDimCRS, crs_to: FourDimCRS):
         self.crs_from = crs_from
         self.crs_to = crs_to
-        self.horz_transform = pyproj.Transformer.from_crs(
-            crs_from.horz_crs, crs_to.horz_crs,
-        )
 
     def transform(self, xx, yy, zz, tt):
         # Horizontal coordinates
         if self.crs_from.horz_crs is self.crs_to.horz_crs:
             x2, y2 = xx, yy
         else:
-            x2, y2 = self.horz_transform.transform(xx, yy)
+            lat, lon = self.crs_from.latlon(xx, yy, zz, tt)
+            x2, y2 = self.crs_to.xy(lat, lon, zz, tt)
 
         # Vertical coordinates
         if self.crs_from.vert_crs is self.crs_to.vert_crs:
