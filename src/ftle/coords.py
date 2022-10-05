@@ -322,6 +322,32 @@ class FourDimCRS:
 
 
 
+def create_z_array_from_roms_dataset(dset):
+    def interleave_w_and_rho_points(w_arr, rho_arr):
+        return np.stack([w_arr, np.r_[rho_arr, 0]]).T.ravel()[:-1]
+
+    c = interleave_w_and_rho_points(dset.Cs_w.values, dset.Cs_r.values)
+    s = np.linspace(-1, 0, len(c))
+    h = dset.h.values.ravel()
+    hc = dset.hc.values.item()
+    vtrans = dset.Vtransform.values.item()
+
+    outshape = (len(c),) + dset.h.shape
+
+    if vtrans == 1:  # Default transform by Song and Haidvogel
+        A = hc * (s - c)[:, None]
+        B = np.outer(c, h)
+        return (A + B).reshape(outshape)
+
+    elif vtrans == 2:  # New transform by Shchepetkin
+        N = hc * s[:, None] + np.outer(c, h)
+        D = 1.0 + hc / h
+        return (N / D).reshape(outshape)
+
+    else:
+        raise ValueError(f'Unknkown Vtransform: {vtrans}')
+
+
 class FourDimTransform:
     def __init__(self, crs_from: FourDimCRS, crs_to: FourDimCRS):
         self.crs_from = crs_from

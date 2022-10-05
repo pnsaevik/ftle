@@ -2,6 +2,7 @@ import pytest
 from ftle import coords
 import pyproj
 import numpy as np
+import xarray as xr
 
 
 class Test_named_crs:
@@ -226,3 +227,28 @@ class Test_FourDimTransform:
         assert y2.tolist() == y.tolist()
         assert z2.tolist() == [0, .25, .5, .75, 1]
         assert t2.tolist() == t.tolist()
+
+
+class Test_create_z_array:
+    def test_correct_when_transform_2_explicit_stretching(self):
+        y, x = np.meshgrid(range(2), range(3), indexing='ij')
+        s = -np.array([8, 7, 6, 3, 0]) / 8
+        dset = xr.Dataset(
+            data_vars=dict(
+                h=xr.Variable(dims=('eta_rho', 'xi_rho'), data=(1 + x + y)*1000),
+                Cs_r=xr.Variable(dims='s_rho', data=s[1::2]),
+                Cs_w=xr.Variable(dims='s_w', data=s[::2]),
+                Vtransform=2,
+                hc=0,
+            ),
+        )
+        z = coords.create_z_array_from_roms_dataset(dset)
+        assert z.tolist() == [
+            [[-1000, -2000, -3000], [-2000, -3000, -4000]],
+            [[-875, -1750, -2625], [-1750, -2625, -3500]],
+            [[-750, -1500, -2250], [-1500, -2250, -3000]],
+            [[-375, -750, -1125], [-750, -1125, -1500]],
+            [[0, 0, 0], [0, 0, 0]],
+        ]
+
+
