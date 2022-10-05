@@ -299,7 +299,7 @@ class Test_FourDimCRS_from_roms_grid:
     def test_depth_correct_when_top_and_bottom(self, dset, crs):
         x = np.array([0, 0, 1, 0])
         y = np.array([0, 1, 1, 0])
-        z = np.array([-1, -1, -1, 0])  # Three bottom values and one surface value
+        z = np.array([-0.5, -0.5, -0.5, dset.dims['s_rho'] - 0.5])  # Three bottom values and one surface value
         depth = -dset.h.values[[0, 1, 1, 0], [0, 0, 1, 0]]
         depth[-1] = 0
 
@@ -309,7 +309,7 @@ class Test_FourDimCRS_from_roms_grid:
     def test_z_correct_when_top_and_bottom(self, dset, crs):
         x = np.array([0, 0, 1, 0])
         y = np.array([0, 1, 1, 0])
-        z = np.array([-1, -1, -1, 0])  # Three bottom values and one surface value
+        z = np.array([-0.5, -0.5, -0.5, dset.dims['s_rho'] - 0.5])  # Three bottom values and one surface value
         depth = -dset.h.values[[0, 1, 1, 0], [0, 0, 1, 0]]
         depth[-1] = 0
 

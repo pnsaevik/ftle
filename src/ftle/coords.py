@@ -448,8 +448,8 @@ def fourdim_crs_from_roms_grid(dset):
     horz_crs = HorzCRS.from_array(dset.lat_rho.values, dset.lon_rho.values)
 
     depth_array = create_depth_array_from_roms_dataset(dset)
-    s = np.linspace(-1, 0, depth_array.shape[0])
-    vert_crs = VertCRS.from_array(depth_array, s)
+    s_rho = 0.5 * np.arange(depth_array.shape[0]) - 0.5
+    vert_crs = VertCRS.from_array(depth_array, s_rho)
 
     np_times = dset.ocean_time.values
     time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
