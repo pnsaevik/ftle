@@ -2,6 +2,7 @@ import cftime
 import pyproj
 from scipy.ndimage import map_coordinates
 import numpy as np
+from contextlib import contextmanager
 
 
 def named_crs(name):
@@ -102,6 +103,10 @@ class HorzCRS:
     def from_name(name):
         return PyprojHorzCRS(named_crs(name))
 
+    @staticmethod
+    def from_array(lat, lon):
+        return ArrayHorzCRS(lat, lon)
+
 
 class PlainHorzCRS(HorzCRS):
     def __init__(self):
@@ -170,9 +175,49 @@ class TimeCRS:
         raise NotImplementedError()
 
     def to_array(self, x, y, z, t):
-        epoch = np.datetime64('1970-01-01', 'us')
-        one_sec = np.timedelta64(1000000, 'us')
-        return epoch + self.posix(x, y, z, t) * one_sec
+        return posix_to_numpy(self.posix(x, y, z, t))
+
+    @staticmethod
+    def from_array(numpy_times, t):
+        return ArrayTimeCRS(numpy_times, t)
+
+    @staticmethod
+    def from_cf(ncatts):
+        if 'calendar' in ncatts:
+            return CFTimeCRS(ncatts['units'], ncatts['calendar'])
+        else:
+            return CFTimeCRS(ncatts['units'])
+
+
+def numpy_to_posix(numpy_times):
+    npdates = np.asarray(numpy_times).astype('datetime64[us]')
+    epoch = np.datetime64('1970-01-01', 'us')
+    one_sec = np.timedelta64(1000000, 'us')
+    return (npdates - epoch) / one_sec
+
+
+def posix_to_numpy(posix_times):
+    epoch = np.datetime64('1970-01-01', 'us')
+    one_sec = np.timedelta64(1000000, 'us')
+    return epoch + posix_times * one_sec
+
+
+class ArrayTimeCRS(TimeCRS):
+    def __init__(self, numpy_times, t):
+        super().__init__()
+
+        self._posix = numpy_to_posix(numpy_times)
+        self._tcoord = t
+
+        from scipy.interpolate import UnivariateSpline
+        self._interp_fwd = UnivariateSpline(self._posix, t, k=1, s=0, ext=0)
+        self._interp_bwd = UnivariateSpline(t, self._posix, k=1, s=0, ext=0)
+
+    def posix(self, x, y, z, t):
+        return self._interp_bwd(t)
+
+    def t(self, x, y, z, posix):
+        return self._interp_fwd(posix)
 
 
 class PlainTimeCRS(TimeCRS):
@@ -202,15 +247,10 @@ class CFTimeCRS(TimeCRS):
             only_use_cftime_datetimes=False,
         )
         npdates = np.array(pydates).astype('datetime64[us]')
-        epoch = np.datetime64('1970-01-01', 'us')
-        one_sec = np.timedelta64(1000000, 'us')
-        return (npdates - epoch) / one_sec
+        return numpy_to_posix(npdates)
 
     def t(self, x, y, z, posix):
-        epoch = np.datetime64('1970-01-01', 'us')
-        one_sec = np.timedelta64(1000000, 'us')
-        npdates = (one_sec * posix).astype('timedelta64[us]') + epoch
-        pydates = npdates.astype(object)
+        pydates = posix_to_numpy(posix).astype(object)
         return cftime.date2num(dates=pydates, units=self.units, calendar=self.calendar)
 
 
@@ -229,6 +269,23 @@ class VertCRS:
         Returns the vertical coordinate at the given depth and horizontal coordinates
         """
         raise NotImplementedError()
+
+    @staticmethod
+    def from_array(depth, z):
+        """
+        Returns a vertical coordinate system based on a depth array.
+
+        The depth array is a 3-dimensional array where the first axis is the vertical
+        axis and the remaining ones are the horizontal axes. The array should be
+        organized so that depth[k, j, i] < depth[k + 1, j, i] <= 0 for all i, j, k.
+
+        The z array is a 1-dimensional array (matching axis 0 of the depth array)
+        containing the vertical coordinates for each depth level.
+
+        :param depth: Depth in meters
+        :param z: Vertical coordinate for each depth level
+        """
+        return ArrayVertCRS(depth, z)
 
 
 class ArrayVertCRS(VertCRS):
@@ -320,9 +377,13 @@ class FourDimCRS:
         self.xy = self.horz_crs.xy
         self.latlon = self.horz_crs.latlon
 
+    @staticmethod
+    def from_roms_grid(fname_or_dset):
+        with open_file_or_dset(fname_or_dset) as dset:
+            return fourdim_crs_from_roms_grid(dset)
 
 
-def create_z_array_from_roms_dataset(dset):
+def create_depth_array_from_roms_dataset(dset):
     def interleave_w_and_rho_points(w_arr, rho_arr):
         return np.stack([w_arr, np.r_[rho_arr, 0]]).T.ravel()[:-1]
 
@@ -377,4 +438,30 @@ class FourDimTransform:
 
         return x2, y2, z2, t2
 
+    @staticmethod
+    def from_roms_grid(file_or_dset):
+        with open_file_or_dset(file_or_dset) as dset:
+            fourdim_crs_from_roms_grid(dset)
 
+
+def fourdim_crs_from_roms_grid(dset):
+    horz_crs = HorzCRS.from_array(dset.lat_rho.values, dset.lon_rho.values)
+
+    depth_array = create_depth_array_from_roms_dataset(dset)
+    s = np.linspace(-1, 0, depth_array.shape[0])
+    vert_crs = VertCRS.from_array(depth_array, s)
+
+    np_times = dset.ocean_time.values
+    time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
+
+    return FourDimCRS(horz_crs, vert_crs, time_crs)
+
+
+@contextmanager
+def open_file_or_dset(d):
+    if isinstance(d, str):
+        import xarray as xr
+        with xr.open_dataset(d) as dset:
+            yield dset
+    else:
+        yield d

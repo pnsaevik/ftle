@@ -230,19 +230,26 @@ class Test_FourDimTransform:
 
 
 class Test_create_z_array:
+    @pytest.fixture(scope='class')
+    def stored_dset(self):
+        from pathlib import Path
+        fname = Path(__file__).parent / 'forcing.nc'
+        with xr.open_dataset(fname) as dset:
+            yield dset
+
     def test_correct_when_transform_2_explicit_stretching(self):
         y, x = np.meshgrid(range(2), range(3), indexing='ij')
         s = -np.array([8, 7, 6, 3, 0]) / 8
         dset = xr.Dataset(
             data_vars=dict(
-                h=xr.Variable(dims=('eta_rho', 'xi_rho'), data=(1 + x + y)*1000),
+                h=xr.Variable(dims=('eta_rho', 'xi_rho'), data=(1 + x + y) * 1000),
                 Cs_r=xr.Variable(dims='s_rho', data=s[1::2]),
                 Cs_w=xr.Variable(dims='s_w', data=s[::2]),
                 Vtransform=2,
                 hc=0,
             ),
         )
-        z = coords.create_z_array_from_roms_dataset(dset)
+        z = coords.create_depth_array_from_roms_dataset(dset)
         assert z.tolist() == [
             [[-1000, -2000, -3000], [-2000, -3000, -4000]],
             [[-875, -1750, -2625], [-1750, -2625, -3500]],
@@ -251,4 +258,76 @@ class Test_create_z_array:
             [[0, 0, 0], [0, 0, 0]],
         ]
 
+    def test_accepts_stored_dset(self, stored_dset):
+        d = stored_dset.dims
+        z = coords.create_depth_array_from_roms_dataset(stored_dset)
+        assert z.shape == (d['s_rho'] + d['s_w'], d['eta_rho'], d['xi_rho'])
 
+
+class Test_FourDimCRS_from_roms_grid:
+    @pytest.fixture(scope='class')
+    def dset(self):
+        from pathlib import Path
+        fname = Path(__file__).parent / 'forcing.nc'
+        with xr.open_dataset(fname) as dset:
+            yield dset
+
+    @pytest.fixture(scope='class')
+    def crs(self, dset):
+        return coords.FourDimCRS.from_roms_grid(dset)
+
+    def test_latlon_correct_when_inside_grid(self, dset, crs):
+        x = np.array([0, 1, 1])
+        y = np.array([0, 0, 1])
+        lat2 = dset.lat_rho.isel(xi_rho=xr.Variable('k', x), eta_rho=xr.Variable('k', y))
+        lon2 = dset.lon_rho.isel(xi_rho=xr.Variable('k', x), eta_rho=xr.Variable('k', y))
+
+        lat, lon = crs.latlon(x, y, None, None)
+        assert lat.tolist() == lat2.values.tolist()
+        assert lon.tolist() == lon2.values.tolist()
+
+    def test_xy_correct_when_inside_grid(self, dset, crs):
+        x = np.array([0, 1, 1])
+        y = np.array([0, 0, 1])
+        lat = dset.lat_rho.isel(xi_rho=xr.Variable('k', x), eta_rho=xr.Variable('k', y))
+        lon = dset.lon_rho.isel(xi_rho=xr.Variable('k', x), eta_rho=xr.Variable('k', y))
+
+        x2, y2 = crs.xy(lat.values, lon.values, None, None)
+        assert x2.round(2).tolist() == x.tolist()
+        assert y2.round(2).tolist() == y.tolist()
+
+    def test_depth_correct_when_top_and_bottom(self, dset, crs):
+        x = np.array([0, 0, 1, 0])
+        y = np.array([0, 1, 1, 0])
+        z = np.array([-1, -1, -1, 0])  # Three bottom values and one surface value
+        depth = -dset.h.values[[0, 1, 1, 0], [0, 0, 1, 0]]
+        depth[-1] = 0
+
+        depth2 = crs.depth(x, y, z, None)
+        assert depth2.tolist() == depth.tolist()
+
+    def test_z_correct_when_top_and_bottom(self, dset, crs):
+        x = np.array([0, 0, 1, 0])
+        y = np.array([0, 1, 1, 0])
+        z = np.array([-1, -1, -1, 0])  # Three bottom values and one surface value
+        depth = -dset.h.values[[0, 1, 1, 0], [0, 0, 1, 0]]
+        depth[-1] = 0
+
+        z2 = crs.z(x, y, depth, None)
+        assert z2.tolist() == z.tolist()
+
+    def test_posix_correct_when_known_times(self, dset, crs):
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = coords.numpy_to_posix(nptimes)
+
+        posix2 = crs.posix(None, None, None, t)
+        assert posix2.tolist() == posix.tolist()
+
+    def test_t_correct_when_known_times(self, dset, crs):
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = coords.numpy_to_posix(nptimes)
+
+        t2 = crs.t(None, None, None, posix)
+        assert t2.tolist() == t.tolist()
