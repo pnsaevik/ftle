@@ -2,10 +2,19 @@ import numpy as np
 
 
 def advect(x, y, z, t, u, v, w, dt, order):
-    def velocity(crd_in, t_in):
+    def velocity3d(crd_in, t_in):
         return np.stack([u(*crd_in, t_in), v(*crd_in, t_in), w(*crd_in, t_in)])
 
-    c0 = np.stack([x, y, z])
+    def velocity2d(crd_in, t_in):
+        return np.stack([u(*crd_in, t_in), v(*crd_in, t_in)])
+
+    # Define either 2d or 3d advection
+    if w is None:
+        c0 = np.stack([x, y])
+        velocity = velocity2d
+    else:
+        c0 = np.stack([x, y, z])
+        velocity = velocity3d
 
     if order == 1:
         c_final = c0 + velocity(c0, t) * dt
@@ -32,4 +41,9 @@ def advect(x, y, z, t, u, v, w, dt, order):
     else:
         raise NotImplementedError(f'Unknown integration order: {order}')
 
-    return c_final[0], c_final[1], c_final[2], t + dt
+    if len(c_final) == 2:
+        z_final = z
+    else:
+        z_final = c_final[2]
+
+    return c_final[0], c_final[1], z_final, t + dt

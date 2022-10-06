@@ -50,3 +50,11 @@ class Test_advect:
         assert z2.tolist() == [10, 11, 12, 13]
         assert t2 == t + dt
 
+    def test_returns_verbatim_z_if_no_vertical_velocity(self, params):
+        x, y, z, t, u, v, w, dt = params
+        x2, y2, z2, t2 = tracker.advect(x, y, z, t, u, v, None, dt, order=1)
+
+        assert x2.tolist() == [2, 3, 4, 5]
+        assert y2.tolist() == [6, 7, 8, 9]
+        assert z2 is z
+        assert t2 == t + dt
