@@ -10,6 +10,15 @@ class Fields:
     def __setitem__(self, key, value):
         self._funcdict[key] = value
 
+    def keys(self):
+        return self._funcdict.keys()
+
+    def values(self):
+        return self._funcdict.values()
+
+    def items(self):
+        return self._funcdict.items()
+
     @staticmethod
     def from_dict(funcdict):
         return Fields(funcdict)
