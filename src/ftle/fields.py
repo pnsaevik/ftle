@@ -49,12 +49,18 @@ def from_roms_dataset(dset):
 
     mappings = dict(
         s_rho='z',
+        s_w='z',
+    )
+
+    offsets = dict(
+        s_w=0.5,
     )
 
     for k, v in dset.data_vars.items():
         mapping = {dim: mappings[dim] for dim in v.dims if dim in mappings}
+        offset = {mappings[dim]: offsets[dim] for dim in v.dims if dim in offsets}
 
-        fn = get_interp_func_from_xr_data_array(v, mapping)
+        fn = get_interp_func_from_xr_data_array(v, mapping, offset)
         funcdict[k] = fn
 
     return Fields(funcdict)

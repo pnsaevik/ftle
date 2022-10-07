@@ -54,7 +54,7 @@ class Test_Fields_from_roms_dataset:
     def coords(self):
         x = np.array([1, 1.5, 2])
         y = np.array([3, 3.5, 4])
-        z = np.array([-.75, -.5, -.25])
+        z = np.array([5, 5.5, 6])
         t = np.array([0, 0.5, 1])
         return t, z, y, x
 
@@ -63,13 +63,29 @@ class Test_Fields_from_roms_dataset:
         func = f['hc']
         result = func(*coords)
         assert result.mean() == result[1]
+        assert not np.isnan(result.mean())
 
     def test_variables_with_dims_zrho(self, forcing_1, coords):
-        f = fields.Fields.from_roms_dataset(forcing_1)
+        t, z, y, x = coords
+        z = np.array([-1.0, -.5, 0])
+
+        f = fields.Fields.from_roms_dataset(forcing_1.drop_vars('s_rho'))
         func = f['Cs_r']
-        result = func(*coords)
+        result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
+        assert np.array(np.isnan(result)).tolist() == [True, True, False]
+
+    def test_variables_with_dims_zw(self, forcing_1, coords):
+        t, z, y, x = coords
+        z = np.array([-1.0, -.5, 0])
+
+        f = fields.Fields.from_roms_dataset(forcing_1.drop_vars('s_w'))
+        func = f['Cs_w']
+        result = func(t, z, y, x)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
+        assert np.array(np.isnan(result)).tolist() == [True, False, False]
 
 
 class Test_get_interp_func_from_xr_data_array:
