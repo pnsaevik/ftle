@@ -17,6 +17,21 @@ class Test_Fields_from_dict:
         assert list(f_dict.keys()) == ['myfield']
 
 
+class Test_Fields_from_dataset:
+    def test_creates_function_for_every_data_variable(self):
+        dset = xr.Dataset(
+            data_vars=dict(
+                hc=xr.Variable((), 5),
+                temp=xr.Variable(('t', 'z', 'y', 'x'), np.zeros((2, 3, 4, 5))),
+                zeta=xr.Variable(('t', 'y', 'x'), np.zeros((2, 4, 5))),
+                h=xr.Variable(('y', 'x'), np.zeros((4, 5))),
+            ),
+        )
+        f = fields.Fields.from_dataset(dset)
+        assert set(f.keys()) == {'hc', 'temp', 'zeta', 'h'}
+        assert all(callable(fn) for fn in f.values())
+
+
 class Test_get_interp_func_from_xr_data_array:
     @pytest.fixture(scope='class')
     def coords(self):

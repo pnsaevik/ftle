@@ -27,6 +27,15 @@ class Fields:
     def from_dict(funcdict):
         return Fields(funcdict)
 
+    @staticmethod
+    def from_dataset(dset):
+        funcdict = dict()
+        for k, v in dset.data_vars.items():
+            fn = get_interp_func_from_xr_data_array(v)
+            funcdict[k] = fn
+
+        return Fields(funcdict)
+
 
 def get_interp_func_from_xr_data_array(darr):
     def mkvar(np_arr):
