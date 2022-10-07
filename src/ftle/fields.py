@@ -23,6 +23,9 @@ class Fields:
     def items(self):
         return self._funcdict.items()
 
+    def __contains__(self, item):
+        return item in self._funcdict
+
     @staticmethod
     def from_dict(funcdict):
         return Fields(funcdict)
@@ -37,7 +40,10 @@ class Fields:
         return Fields(funcdict)
 
 
-def get_interp_func_from_xr_data_array(darr):
+def get_interp_func_from_xr_data_array(darr, mapping=None):
+    if mapping is not None:
+        darr = darr.rename(mapping)
+
     def mkvar(np_arr):
         return xr.Variable('pid', np_arr)
 

@@ -2,6 +2,23 @@ import pytest
 from ftle import fields
 import xarray as xr
 import numpy as np
+from pathlib import Path
+
+
+FORCING_1 = Path(__file__).parent / 'forcing_1.nc'
+FORCING_2 = Path(__file__).parent / 'forcing_2.nc'
+
+
+@pytest.fixture(scope='module')
+def forcing_1():
+    with xr.open_dataset(FORCING_1) as dset:
+        yield dset
+
+
+@pytest.fixture(scope='module')
+def forcing_2():
+    with xr.open_dataset(FORCING_2) as dset:
+        yield dset
 
 
 class Test_Fields_from_dict:
@@ -96,3 +113,11 @@ class Test_get_interp_func_from_xr_data_array:
         result = fn(*coords)
         assert result == 42
         assert result.dtype == fn.dtype
+
+    def test_accepts_mapping(self, coords, darr):
+        mapping = dict(t='ocean_time', z='s_rho', y='eta_rho', x='xi_rho')
+        inv_mapping = dict(ocean_time='t', s_rho='z', eta_rho='y', xi_rho='x')
+        roms_darr = darr.rename(mapping)
+        fn_roms = fields.get_interp_func_from_xr_data_array(roms_darr, inv_mapping)
+        fn_regular = fields.get_interp_func_from_xr_data_array(darr)
+        assert list(fn_roms(*coords)) == list(fn_regular(*coords))
