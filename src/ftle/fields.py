@@ -40,23 +40,37 @@ class Fields:
         return Fields(funcdict)
 
     @staticmethod
-    def from_roms_dataset(dset):
-        return from_roms_dataset(dset)
+    def from_roms_dataset(dset, remove_coords=True, posix_time=True):
+        return from_roms_dataset(dset, remove_coords, posix_time)
 
 
-def from_roms_dataset(dset):
+def from_roms_dataset(dset, remove_coords=True, posix_time=True):
     funcdict = dict()
 
     mappings = dict(
         s_rho='z',
         s_w='z',
+        ocean_time='t',
     )
 
     offsets = dict(
         s_w=0.5,
     )
 
-    for k, v in dset.data_vars.items():
+    if remove_coords:
+        data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
+    else:
+        data_vars = {**dict(dset.data_vars), **dict(dset.coords)}
+
+    if posix_time and 'ocean_time' in data_vars:
+        epoch = np.datetime64('1970-01-01', 'us')
+        one_sec = np.timedelta64(1000000, 'us')
+        posix = (data_vars['ocean_time'] - epoch) / one_sec
+        if not remove_coords:
+            posix.coords['ocean_time'] = posix.variable
+        data_vars['ocean_time'] = posix
+
+    for k, v in data_vars.items():
         mapping = {dim: mappings[dim] for dim in v.dims if dim in mappings}
         offset = {mappings[dim]: offsets[dim] for dim in v.dims if dim in offsets}
 

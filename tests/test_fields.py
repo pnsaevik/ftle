@@ -69,7 +69,7 @@ class Test_Fields_from_roms_dataset:
         t, z, y, x = coords
         z = np.array([-1.0, -.5, 0])
 
-        f = fields.Fields.from_roms_dataset(forcing_1.drop_vars('s_rho'))
+        f = fields.Fields.from_roms_dataset(forcing_1)
         func = f['Cs_r']
         result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
@@ -80,8 +80,19 @@ class Test_Fields_from_roms_dataset:
         t, z, y, x = coords
         z = np.array([-1.0, -.5, 0])
 
-        f = fields.Fields.from_roms_dataset(forcing_1.drop_vars('s_w'))
+        f = fields.Fields.from_roms_dataset(forcing_1)
         func = f['Cs_w']
+        result = func(t, z, y, x)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
+        assert np.array(np.isnan(result)).tolist() == [True, False, False]
+
+    def test_variables_with_dims_time(self, forcing_1, coords):
+        t, z, y, x = coords
+        t = np.array([-.5, 0, 0.5])
+
+        f = fields.Fields.from_roms_dataset(forcing_1)
+        func = f['ocean_time']
         result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
