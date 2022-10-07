@@ -39,6 +39,19 @@ class Fields:
 
         return Fields(funcdict)
 
+    @staticmethod
+    def from_roms_dataset(dset):
+        return from_roms_dataset(dset)
+
+
+def from_roms_dataset(dset):
+    funcdict = dict()
+    for k, v in dset.data_vars.items():
+        fn = get_interp_func_from_xr_data_array(v)
+        funcdict[k] = fn
+
+    return Fields(funcdict)
+
 
 def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None):
     if mapping is not None:
@@ -58,8 +71,13 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None):
             coords = shift(coords)
         return darr.interp(**coords)
 
+    def fn_singledim(t, z, y, x):
+        return xr.broadcast(darr, xr.DataArray(mkvar(x)))[0]
+
+    fn.dtype = np.dtype('f8')
+    fn_singledim.dtype = darr.dtype
+
     if darr.dims == ():
-        fn.dtype = darr.dtype
+        return fn_singledim
     else:
-        fn.dtype = np.dtype('f8')
-    return fn
+        return fn

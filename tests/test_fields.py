@@ -49,6 +49,22 @@ class Test_Fields_from_dataset:
         assert all(callable(fn) for fn in f.values())
 
 
+class Test_Fields_from_roms_dataset:
+    @pytest.fixture(scope='class')
+    def coords(self):
+        x = np.array([1, 1.5, 2])
+        y = np.array([3, 3.5, 4])
+        z = np.array([5, 5.5, 6])
+        t = np.array([0, 0.5, 1])
+        return t, z, y, x
+
+    def test_variables_with_no_dims(self, forcing_1, coords):
+        f = fields.Fields.from_roms_dataset(forcing_1)
+        func = f['hc']
+        result = func(*coords)
+        assert result.mean() == result[1]
+
+
 class Test_get_interp_func_from_xr_data_array:
     @pytest.fixture(scope='class')
     def coords(self):
@@ -96,15 +112,16 @@ class Test_get_interp_func_from_xr_data_array:
 
     def test_interpolates_lower_dimensional_arrays(self, darr):
         coords = [np.array([0, 0.5, 1])] * 4
-        for i in range(4):
+        for i in range(5):
             lowdim_array = darr[(0, ) * i]
             fn = fields.get_interp_func_from_xr_data_array(lowdim_array)
             result = fn(*coords)
 
             assert len(result) == len(coords[0]), f"Dim {i}: Wrong output dimension"
-            assert result[0] != result[1], f"Dim {i}: Constant output, variable input"
             assert result.mean() == result[1], f"Dim {i}: Nonlinear change in output"
             assert result.dtype == fn.dtype, f"Dim {i}: Wrong output data type"
+            if i < len(coords):
+                assert result[0] != result[1], f"Dim {i}: Constant output, variable input"
 
     def test_accepts_nondimensional_array(self):
         coords = [np.array([0, 0.5, 1])] * 4
