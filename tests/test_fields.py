@@ -154,6 +154,44 @@ class Test_Fields_from_roms_dataset:
         assert result[0] == result[1]
         assert result[0] != result[2]
 
+    def test_can_interpolate_using_depth(self, forcing_1):
+        f_zdepth = fields.Fields.from_roms_dataset(forcing_1, z_depth=True)
+        f_regular = fields.Fields.from_roms_dataset(forcing_1)
+        t = np.array([0, 0, 0, 0])
+        z = np.array([-.5, 0, .5, forcing_1.dims['s_rho'] - .5])
+        y = np.array([5, 5, 5, 5])
+        x = np.array([5, 5, 5, 5])
+
+        fn_zdepth = f_zdepth['Cs_w']
+        fn_regular = f_regular['Cs_w']
+
+        result_zdepth = fn_zdepth(t, z, y, x)
+        result_regular = fn_regular(t, z, y, x)
+
+        # Regular[-.5]: Ocean floor
+        assert result_regular[0] == -1
+
+        # Regular[0]: Middle of first layer
+        assert -1 < result_regular[1]
+
+        # Regular[.5]: First layer boundary
+        assert result_regular[2] == forcing_1['Cs_w'][1]
+
+        # Regular[35.5]: Surface
+        assert result_regular[3] == 0
+
+        # Depth[-.5]: Slightly above surface (but clipped to 0)
+        assert result_zdepth[0] == 0
+
+        # Depth[0]: Surface
+        assert result_zdepth[1] == 0
+
+        # Depth[.5]: Slightly below surface
+        assert result_zdepth[2] < 0
+
+        # Depth[35.5]: Below ocean floor (but clipped to ocean floor)
+        assert result_zdepth[3] == -1
+
 
 class Test_get_interp_func_from_xr_data_array:
     @pytest.fixture(scope='class')

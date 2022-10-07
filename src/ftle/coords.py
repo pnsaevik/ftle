@@ -326,7 +326,7 @@ class ArrayVertCRS(VertCRS):
         return np.interp(z, self._zcoord, kcoord)
 
     def _get_z_from_k(self, k):
-        return map_coordinates(self._zcoord, [k], order=1)
+        return map_coordinates(self._zcoord, [k], order=1, mode='nearest')
 
     def _get_depth_from_xyk(self, x, y, k):
         return map_coordinates(self._depth, [k, y, x], order=1)

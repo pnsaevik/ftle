@@ -40,11 +40,27 @@ class Fields:
         return Fields(funcdict)
 
     @staticmethod
-    def from_roms_dataset(dset, remove_coords=True, posix_time=True):
-        return from_roms_dataset(dset, remove_coords, posix_time)
+    def from_roms_dataset(dset, remove_coords=True, posix_time=True, z_depth=False):
+        """
+        Create Fields object from ROMS dataset
+
+        :param dset: A ROMS dataset (xarray.Dataset)
+
+        :param remove_coords: True if interpolation should take fractional zero-based
+        indices as input instead of dataset coordinates (default = True)
+
+        :param posix_time: True if the time variable should be converted to posix
+        timestamps (default = True)
+
+        :param z_depth: True if interpolation should take depth as input instead of
+        S-coordinates (default = False)
+
+        :return: A Fields object
+        """
+        return from_roms_dataset(dset, remove_coords, posix_time, z_depth)
 
 
-def from_roms_dataset(dset, remove_coords=True, posix_time=True):
+def from_roms_dataset(dset, remove_coords=True, posix_time=True, z_depth=False):
     funcdict = dict()
 
     mappings = dict(
@@ -75,6 +91,12 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True):
     else:
         data_vars = {**dict(dset.data_vars), **dict(dset.coords)}
 
+    if z_depth:
+        from .coords import VertCRS
+        vert_crs = VertCRS.from_roms(dset)
+    else:
+        vert_crs = None
+
     if posix_time and 'ocean_time' in data_vars:
         epoch = np.datetime64('1970-01-01', 'us')
         one_sec = np.timedelta64(1000000, 'us')
@@ -89,9 +111,21 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True):
         nearest = nearests.get(k, ())
 
         fn = get_interp_func_from_xr_data_array(v, mapping, offset, nearest)
+
+        if vert_crs is not None:
+            fn = _get_vtrans_function(fn, vert_crs)
+
         funcdict[k] = fn
 
     return Fields(funcdict)
+
+
+def _get_vtrans_function(func, vtrans):
+    def fn(t, z, y, x):
+        new_z = vtrans.z(x, y, -z, t)
+        return func(t, new_z, y, x)
+
+    return fn
 
 
 def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=()):
