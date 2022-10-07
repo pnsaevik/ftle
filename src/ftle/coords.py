@@ -107,6 +107,10 @@ class HorzCRS:
     def from_array(lat, lon):
         return ArrayHorzCRS(lat, lon)
 
+    @staticmethod
+    def from_roms(dset):
+        return HorzCRS.from_array(dset.lat_rho.values, dset.lon_rho.values)
+
 
 class PlainHorzCRS(HorzCRS):
     def __init__(self):
@@ -287,6 +291,12 @@ class VertCRS:
         """
         return ArrayVertCRS(depth, z)
 
+    @staticmethod
+    def from_roms(dset):
+        depth_array = create_depth_array_from_roms_dataset(dset)
+        s_rho = 0.5 * np.arange(depth_array.shape[0]) - 0.5
+        return VertCRS.from_array(depth_array, s_rho)
+
 
 class ArrayVertCRS(VertCRS):
     """
@@ -445,11 +455,8 @@ class FourDimTransform:
 
 
 def fourdim_crs_from_roms_grid(dset):
-    horz_crs = HorzCRS.from_array(dset.lat_rho.values, dset.lon_rho.values)
-
-    depth_array = create_depth_array_from_roms_dataset(dset)
-    s_rho = 0.5 * np.arange(depth_array.shape[0]) - 0.5
-    vert_crs = VertCRS.from_array(depth_array, s_rho)
+    horz_crs = HorzCRS.from_roms(dset)
+    vert_crs = VertCRS.from_roms(dset)
 
     np_times = dset.ocean_time.values
     time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
