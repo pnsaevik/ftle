@@ -98,6 +98,32 @@ class Test_Fields_from_roms_dataset:
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, False, False]
 
+    def test_variables_with_dims_etarho_xirho(self, forcing_1, coords):
+        t, z, y, x = coords
+        y = np.array([-.5, 0, 0])
+        x = np.array([0, -.5, 0])
+
+        f = fields.Fields.from_roms_dataset(forcing_1)
+        func = f['h']
+        result = func(t, z, y, x)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
+        assert np.array(np.isnan(result)).tolist() == [True, True, False]
+
+    def test_variables_with_dims_time_etarho_xirho(self, forcing_1, coords):
+        f = fields.Fields.from_roms_dataset(forcing_1)
+        func = f['zeta']
+        result = func(*coords)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
+
+    def test_variables_with_fourdims_rho(self, forcing_1, coords):
+        f = fields.Fields.from_roms_dataset(forcing_1)
+        func = f['temp']
+        result = func(*coords)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
+
 
 class Test_get_interp_func_from_xr_data_array:
     @pytest.fixture(scope='class')

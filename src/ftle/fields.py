@@ -50,6 +50,8 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True):
     mappings = dict(
         s_rho='z',
         s_w='z',
+        eta_rho='y',
+        xi_rho='x',
         ocean_time='t',
     )
 
