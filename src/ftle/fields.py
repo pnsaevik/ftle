@@ -46,8 +46,15 @@ class Fields:
 
 def from_roms_dataset(dset):
     funcdict = dict()
+
+    mappings = dict(
+        s_rho='z',
+    )
+
     for k, v in dset.data_vars.items():
-        fn = get_interp_func_from_xr_data_array(v)
+        mapping = {dim: mappings[dim] for dim in v.dims if dim in mappings}
+
+        fn = get_interp_func_from_xr_data_array(v, mapping)
         funcdict[k] = fn
 
     return Fields(funcdict)
@@ -72,7 +79,8 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None):
         return darr.interp(**coords)
 
     def fn_singledim(t, z, y, x):
-        return xr.broadcast(darr, xr.DataArray(mkvar(x)))[0]
+        v = next(vv for vv in (t, z, y, x) if vv.shape != ())
+        return xr.broadcast(darr, xr.DataArray(mkvar(v)))[0]
 
     fn.dtype = np.dtype('f8')
     fn_singledim.dtype = darr.dtype

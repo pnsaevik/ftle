@@ -54,7 +54,7 @@ class Test_Fields_from_roms_dataset:
     def coords(self):
         x = np.array([1, 1.5, 2])
         y = np.array([3, 3.5, 4])
-        z = np.array([5, 5.5, 6])
+        z = np.array([-.75, -.5, -.25])
         t = np.array([0, 0.5, 1])
         return t, z, y, x
 
@@ -63,6 +63,13 @@ class Test_Fields_from_roms_dataset:
         func = f['hc']
         result = func(*coords)
         assert result.mean() == result[1]
+
+    def test_variables_with_dims_zrho(self, forcing_1, coords):
+        f = fields.Fields.from_roms_dataset(forcing_1)
+        func = f['Cs_r']
+        result = func(*coords)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
 
 
 class Test_get_interp_func_from_xr_data_array:
