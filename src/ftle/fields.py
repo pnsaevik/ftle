@@ -88,7 +88,35 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True):
     return Fields(funcdict)
 
 
-def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None):
+def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=()):
+    """
+    Create 4D interpolation function from grid variables
+
+    :param darr:
+
+    Input data. Should be an xarray.DataArray. Dimensions that are named
+    't', 'z', 'y' or 'x' are interpolated. Other dimension names are permittible if a
+    `mapping` argument is given.
+
+    The input data need not include all 4 dimensions. Missing dimensions are ignored
+    during interpolation.
+
+    If `darr` has coordinates, these are the basis for the interpolation. Otherwise,
+    a zero-based range index is implied. For instance, fn(0, 0, 0, 0) should return
+    the first element of `darr` if the array has no coordinates.
+
+    :param mapping: Mapping from `darr` dimension names to ('t', 'z', 'y', 'x')
+
+    :param offset: A mapping of offset values. Offset values are added to the coordinates
+    before interpolation. For instance, fn(100, 0, 0, 0) returns the first element of
+    `darr` if there are no coordinates and offset = {'t': -100}.
+
+    :param nearest: A subset of {'t', 'z', 'y', 'x'}. Specifies dimensions which should
+    be interpolated using the `nearest` algorithm.
+
+    :return: A function fn(t, z, y, x) which samples the array value at fractional
+    coordinates.
+    """
     if mapping is not None:
         darr = darr.rename(mapping)
 
@@ -104,6 +132,10 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None):
         coords = {k: coords[k] for k in darr.dims}
         if offset:
             coords = shift(coords)
+
+        for k in nearest:
+            coords[k] = np.round(coords[k])
+
         return darr.interp(**coords)
 
     def fn_singledim(t, z, y, x):

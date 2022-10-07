@@ -216,3 +216,19 @@ class Test_get_interp_func_from_xr_data_array:
         fn_offset = fields.get_interp_func_from_xr_data_array(darr, offset=offset)
         fn_regular = fields.get_interp_func_from_xr_data_array(darr)
         assert list(fn_regular(*coords)) == list(fn_offset(*coords2))
+
+    def test_accepts_nearest(self, darr):
+        nearest = ['x']
+
+        darr = darr.isel(t=0, z=0)
+        x = np.array([0, .4, .6, 0])
+        y = np.array([0, 0, 0, .1])
+        z = np.zeros_like(x)
+        t = np.zeros_like(x)
+
+        fn = fields.get_interp_func_from_xr_data_array(darr, nearest=nearest)
+        result = fn(t, z, y, x)
+
+        assert result[0] == result[1]  # Constant when small x change
+        assert result[0] != result[2]  # Nonconstant when big x change
+        assert result[0] != result[3]  # Nonconstant when small y change
