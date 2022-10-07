@@ -157,14 +157,6 @@ class Test_get_interp_func_from_xr_data_array:
             if i < len(coords):
                 assert result[0] != result[1], f"Dim {i}: Constant output, variable input"
 
-    def test_accepts_nondimensional_array(self):
-        coords = [np.array([0, 0.5, 1])] * 4
-        darr = xr.DataArray(data=42, dims=())
-        fn = fields.get_interp_func_from_xr_data_array(darr)
-        result = fn(*coords)
-        assert result == 42
-        assert result.dtype == fn.dtype
-
     def test_accepts_mapping(self, coords, darr):
         mapping = dict(t='ocean_time', z='s_rho', y='eta_rho', x='xi_rho')
         inv_map = dict(ocean_time='t', s_rho='z', eta_rho='y', xi_rho='x')
