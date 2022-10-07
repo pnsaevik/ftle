@@ -3,6 +3,16 @@ from ftle import coords
 import pyproj
 import numpy as np
 import xarray as xr
+from pathlib import Path
+
+
+FORCING_1 = Path(__file__).parent / 'forcing_1.nc'
+
+
+@pytest.fixture(scope='module')
+def dset():
+    with xr.open_dataset(FORCING_1) as dset:
+        yield dset
 
 
 class Test_named_crs:
@@ -230,13 +240,6 @@ class Test_FourDimTransform:
 
 
 class Test_create_z_array:
-    @pytest.fixture(scope='class')
-    def stored_dset(self):
-        from pathlib import Path
-        fname = Path(__file__).parent / 'forcing.nc'
-        with xr.open_dataset(fname) as dset:
-            yield dset
-
     def test_correct_when_transform_2_explicit_stretching(self):
         y, x = np.meshgrid(range(2), range(3), indexing='ij')
         s = -np.array([8, 7, 6, 3, 0]) / 8
@@ -258,20 +261,13 @@ class Test_create_z_array:
             [[0, 0, 0], [0, 0, 0]],
         ]
 
-    def test_accepts_stored_dset(self, stored_dset):
-        d = stored_dset.dims
-        z = coords.create_depth_array_from_roms_dataset(stored_dset)
+    def test_accepts_stored_dset(self, dset):
+        d = dset.dims
+        z = coords.create_depth_array_from_roms_dataset(dset)
         assert z.shape == (d['s_rho'] + d['s_w'], d['eta_rho'], d['xi_rho'])
 
 
 class Test_FourDimCRS_from_roms_grid:
-    @pytest.fixture(scope='class')
-    def dset(self):
-        from pathlib import Path
-        fname = Path(__file__).parent / 'forcing.nc'
-        with xr.open_dataset(fname) as dset:
-            yield dset
-
     @pytest.fixture(scope='class')
     def crs(self, dset):
         return coords.FourDimCRS.from_roms_grid(dset)
