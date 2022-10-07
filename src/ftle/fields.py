@@ -52,11 +52,17 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True):
         s_w='z',
         eta_rho='y',
         xi_rho='x',
+        eta_u='y',
+        xi_u='x',
+        eta_v='y',
+        xi_v='x',
         ocean_time='t',
     )
 
     offsets = dict(
         s_w=0.5,
+        xi_u=-0.5,
+        eta_v=-0.5,
     )
 
     if remove_coords:

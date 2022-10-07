@@ -58,71 +58,90 @@ class Test_Fields_from_roms_dataset:
         t = np.array([0, 0.5, 1])
         return t, z, y, x
 
-    def test_variables_with_no_dims(self, forcing_1, coords):
-        f = fields.Fields.from_roms_dataset(forcing_1)
-        func = f['hc']
+    @pytest.fixture(scope='class')
+    def fields_1(self, forcing_1):
+        return fields.Fields.from_roms_dataset(forcing_1)
+
+    def test_variables_with_no_dims(self, fields_1, coords):
+        func = fields_1['hc']
         result = func(*coords)
         assert result.mean() == result[1]
         assert not np.isnan(result.mean())
 
-    def test_variables_with_dims_zrho(self, forcing_1, coords):
+    def test_variables_with_dims_zrho(self, fields_1, coords):
         t, z, y, x = coords
         z = np.array([-1.0, -.5, 0])
 
-        f = fields.Fields.from_roms_dataset(forcing_1)
-        func = f['Cs_r']
+        func = fields_1['Cs_r']
         result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, True, False]
 
-    def test_variables_with_dims_zw(self, forcing_1, coords):
+    def test_variables_with_dims_zw(self, fields_1, coords):
         t, z, y, x = coords
         z = np.array([-1.0, -.5, 0])
 
-        f = fields.Fields.from_roms_dataset(forcing_1)
-        func = f['Cs_w']
+        func = fields_1['Cs_w']
         result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, False, False]
 
-    def test_variables_with_dims_time(self, forcing_1, coords):
+    def test_variables_with_dims_time(self, fields_1, coords):
         t, z, y, x = coords
         t = np.array([-.5, 0, 0.5])
 
-        f = fields.Fields.from_roms_dataset(forcing_1)
-        func = f['ocean_time']
+        func = fields_1['ocean_time']
         result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, False, False]
 
-    def test_variables_with_dims_etarho_xirho(self, forcing_1, coords):
+    def test_variables_with_dims_etarho_xirho(self, fields_1, coords):
         t, z, y, x = coords
         y = np.array([-.5, 0, 0])
         x = np.array([0, -.5, 0])
 
-        f = fields.Fields.from_roms_dataset(forcing_1)
-        func = f['h']
+        func = fields_1['h']
         result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, True, False]
 
-    def test_variables_with_dims_time_etarho_xirho(self, forcing_1, coords):
-        f = fields.Fields.from_roms_dataset(forcing_1)
-        func = f['zeta']
+    def test_variables_with_dims_time_etarho_xirho(self, fields_1, coords):
+        func = fields_1['zeta']
         result = func(*coords)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
 
-    def test_variables_with_fourdims_rho(self, forcing_1, coords):
-        f = fields.Fields.from_roms_dataset(forcing_1)
-        func = f['temp']
+    def test_variables_with_fourdims_rho(self, fields_1, coords):
+        func = fields_1['temp']
         result = func(*coords)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
+
+    def test_boundaries_of_variable_u(self, fields_1, coords):
+        t, z, y, x = coords
+        y = np.array([-.5, 0, 0])
+        x = np.array([0.5, 0, 0.5])
+
+        func = fields_1['u']
+        result = func(t, z, y, x)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
+        assert np.array(np.isnan(result)).tolist() == [True, True, False]
+
+    def test_boundaries_of_variable_v(self, fields_1, coords):
+        t, z, y, x = coords
+        y = np.array([0.5, 0, 0.5])
+        x = np.array([-.5, 0, 0])
+
+        func = fields_1['v']
+        result = func(t, z, y, x)
+        assert result.shape == (len(coords[0]), )
+        assert result.dtype == func.dtype
+        assert np.array(np.isnan(result)).tolist() == [True, True, False]
 
 
 class Test_get_interp_func_from_xr_data_array:
