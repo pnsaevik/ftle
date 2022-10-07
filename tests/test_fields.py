@@ -123,7 +123,7 @@ class Test_Fields_from_roms_dataset:
 
     def test_boundaries_of_variable_u(self, fields_1, coords):
         t, z, y, x = coords
-        y = np.array([-.5, 0, 0])
+        y = np.array([-1, -.5, -.5])
         x = np.array([0.5, 0, 0.5])
 
         func = fields_1['u']
@@ -135,13 +135,24 @@ class Test_Fields_from_roms_dataset:
     def test_boundaries_of_variable_v(self, fields_1, coords):
         t, z, y, x = coords
         y = np.array([0.5, 0, 0.5])
-        x = np.array([-.5, 0, 0])
+        x = np.array([-1, -.5, -.5])
 
         func = fields_1['v']
         result = func(t, z, y, x)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, True, False]
+
+    def test_u_interpolates_by_nearest_algorithm_in_y_direction(self, fields_1):
+        y = np.array([0, .4, .6])
+        x = np.array([.5, .5, .5])
+        z = np.ones_like(x)
+        t = np.zeros_like(x)
+
+        func = fields_1['u']
+        result = func(t, z, y, x)
+        assert result[0] == result[1]
+        assert result[0] != result[2]
 
 
 class Test_get_interp_func_from_xr_data_array:

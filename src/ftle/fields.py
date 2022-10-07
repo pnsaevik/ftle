@@ -65,6 +65,11 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True):
         eta_v=-0.5,
     )
 
+    nearests = dict(
+        u={'y'},
+        v={'x'},
+    )
+
     if remove_coords:
         data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
     else:
@@ -81,8 +86,9 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True):
     for k, v in data_vars.items():
         mapping = {dim: mappings[dim] for dim in v.dims if dim in mappings}
         offset = {mappings[dim]: offsets[dim] for dim in v.dims if dim in offsets}
+        nearest = nearests.get(k, ())
 
-        fn = get_interp_func_from_xr_data_array(v, mapping, offset)
+        fn = get_interp_func_from_xr_data_array(v, mapping, offset, nearest)
         funcdict[k] = fn
 
     return Fields(funcdict)
