@@ -40,16 +40,23 @@ class Fields:
         return Fields(funcdict)
 
 
-def get_interp_func_from_xr_data_array(darr, mapping=None):
+def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None):
     if mapping is not None:
         darr = darr.rename(mapping)
 
     def mkvar(np_arr):
         return xr.Variable('pid', np_arr)
 
+    def shift(coords_in):
+        """Shift coordinates by the specified offset if it exists"""
+        return {k: v + offset[k] if k in offset else v for k, v in coords_in.items()}
+
     def fn(t, z, y, x):
         coords = dict(x=mkvar(x), y=mkvar(y), z=mkvar(z), t=mkvar(t))
-        return darr.interp(**{k: coords[k] for k in darr.dims})
+        coords = {k: coords[k] for k in darr.dims}
+        if offset:
+            coords = shift(coords)
+        return darr.interp(**coords)
 
     if darr.dims == ():
         fn.dtype = darr.dtype

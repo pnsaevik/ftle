@@ -56,7 +56,7 @@ class Test_get_interp_func_from_xr_data_array:
         y = np.array([.4, .5, .6])
         z = np.array([.7, .8, .9])
         t = np.array([1.0] * len(x))
-        return x, y, z, t
+        return t, z, y, x
 
     @pytest.fixture(scope='class')
     def darr(self):
@@ -116,8 +116,15 @@ class Test_get_interp_func_from_xr_data_array:
 
     def test_accepts_mapping(self, coords, darr):
         mapping = dict(t='ocean_time', z='s_rho', y='eta_rho', x='xi_rho')
-        inv_mapping = dict(ocean_time='t', s_rho='z', eta_rho='y', xi_rho='x')
+        inv_map = dict(ocean_time='t', s_rho='z', eta_rho='y', xi_rho='x')
         roms_darr = darr.rename(mapping)
-        fn_roms = fields.get_interp_func_from_xr_data_array(roms_darr, inv_mapping)
+        fn_roms = fields.get_interp_func_from_xr_data_array(roms_darr, mapping=inv_map)
         fn_regular = fields.get_interp_func_from_xr_data_array(darr)
         assert list(fn_roms(*coords)) == list(fn_regular(*coords))
+
+    def test_accepts_offset(self, coords, darr):
+        offset = dict(t=-100)
+        coords2 = (coords[0] + 100, ) + coords[1:]
+        fn_offset = fields.get_interp_func_from_xr_data_array(darr, offset=offset)
+        fn_regular = fields.get_interp_func_from_xr_data_array(darr)
+        assert list(fn_regular(*coords)) == list(fn_offset(*coords2))
