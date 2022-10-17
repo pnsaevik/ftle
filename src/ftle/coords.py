@@ -224,6 +224,20 @@ class ArrayTimeCRS(TimeCRS):
         return self._interp_fwd(posix)
 
 
+class NumpyTimeCRS(TimeCRS):
+    def __init__(self):
+        super().__init__()
+
+        self._interp_fwd = posix_to_numpy
+        self._interp_bwd = numpy_to_posix
+
+    def posix(self, x, y, z, t):
+        return self._interp_bwd(t)
+
+    def t(self, x, y, z, posix):
+        return self._interp_fwd(posix)
+
+
 class PlainTimeCRS(TimeCRS):
     def __init__(self):
         super().__init__()
@@ -388,9 +402,9 @@ class FourDimCRS:
         self.latlon = self.horz_crs.latlon
 
     @staticmethod
-    def from_roms_grid(fname_or_dset):
+    def from_roms_grid(fname_or_dset, t_coord=None):
         with open_file_or_dset(fname_or_dset) as dset:
-            return fourdim_crs_from_roms_grid(dset)
+            return fourdim_crs_from_roms_grid(dset, t_coord=t_coord)
 
 
 def create_depth_array_from_roms_dataset(dset):
@@ -449,17 +463,24 @@ class FourDimTransform:
         return x2, y2, z2, t2
 
     @staticmethod
-    def from_roms_grid(file_or_dset):
+    def from_roms_grid(file_or_dset, t_coord=None):
         with open_file_or_dset(file_or_dset) as dset:
-            fourdim_crs_from_roms_grid(dset)
+            fourdim_crs_from_roms_grid(dset, t_coord=t_coord)
 
 
-def fourdim_crs_from_roms_grid(dset):
+def fourdim_crs_from_roms_grid(dset, t_coord=None):
     horz_crs = HorzCRS.from_roms(dset)
     vert_crs = VertCRS.from_roms(dset)
 
     np_times = dset.ocean_time.values
-    time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
+    if t_coord is None or t_coord == 'index':
+        time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
+    elif t_coord == 'posix':
+        time_crs = TimeCRS.from_array(np_times, numpy_to_posix(np_times))
+    elif t_coord == 'numpy':
+        time_crs = NumpyTimeCRS()
+    else:
+        raise ValueError(f'Unexpected t_coord value: {t_coord}')
 
     return FourDimCRS(horz_crs, vert_crs, time_crs)
 

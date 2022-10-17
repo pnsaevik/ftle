@@ -327,3 +327,24 @@ class Test_FourDimCRS_from_roms_grid:
 
         t2 = crs.t(None, None, None, posix)
         assert t2.tolist() == t.tolist()
+
+    def test_can_specify_posix_t_coord(self, dset):
+        crs = coords.FourDimCRS.from_roms_grid(dset, t_coord='posix')
+
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = coords.numpy_to_posix(nptimes)
+
+        # Input is posix, output is posix
+        posix2 = crs.posix(None, None, None, posix)
+        assert posix2.tolist() == posix.tolist()
+
+    def test_can_specify_numpy_t_coord(self, dset):
+        crs = coords.FourDimCRS.from_roms_grid(dset, t_coord='numpy')
+
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = coords.numpy_to_posix(nptimes)
+
+        posix2 = crs.posix(None, None, None, nptimes)
+        assert posix2.tolist() == posix.tolist()
