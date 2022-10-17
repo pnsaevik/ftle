@@ -319,10 +319,17 @@ class VertCRS:
         return ArrayVertCRS(depth, z)
 
     @staticmethod
-    def from_roms(dset):
-        depth_array = create_depth_array_from_roms_dataset(dset)
-        s_rho = 0.5 * np.arange(depth_array.shape[0]) - 0.5
-        return VertCRS.from_array(depth_array, s_rho)
+    def from_roms(dset, z_coord=None):
+        if z_coord is None or z_coord == 'index':
+            depth_array = create_depth_array_from_roms_dataset(dset)
+            z_index = 0.5 * np.arange(depth_array.shape[0]) - 0.5
+            return VertCRS.from_array(depth_array, z_index)
+        elif z_coord == 'S-coord':
+            depth_array = create_depth_array_from_roms_dataset(dset)
+            s_coord = np.linspace(-1, 0, depth_array.shape[0])
+            return VertCRS.from_array(depth_array, s_coord)
+        else:
+            raise ValueError(f'Unexpected z_coord: {z_coord}')
 
 
 class ArrayVertCRS(VertCRS):
@@ -415,9 +422,17 @@ class FourDimCRS:
         self.latlon = self.horz_crs.latlon
 
     @staticmethod
-    def from_roms_grid(fname_or_dset, t_coord=None):
+    def from_roms_grid(fname_or_dset, z_coord=None, t_coord=None):
         with open_file_or_dset(fname_or_dset) as dset:
-            return fourdim_crs_from_roms_grid(dset, t_coord=t_coord)
+            return fourdim_crs_from_roms_grid(dset, z_coord=z_coord, t_coord=t_coord)
+
+
+def fourdim_crs_from_roms_grid(dset, z_coord=None, t_coord=None):
+    horz_crs = HorzCRS.from_roms(dset)
+    vert_crs = VertCRS.from_roms(dset, z_coord=z_coord)
+    time_crs = TimeCRS.from_roms(dset, t_coord=t_coord)
+
+    return FourDimCRS(horz_crs, vert_crs, time_crs)
 
 
 def create_depth_array_from_roms_dataset(dset):
@@ -474,19 +489,6 @@ class FourDimTransform:
             t2 = self.crs_to.t(xx, yy, zz, t_posix)
 
         return x2, y2, z2, t2
-
-    @staticmethod
-    def from_roms_grid(file_or_dset, t_coord=None):
-        with open_file_or_dset(file_or_dset) as dset:
-            fourdim_crs_from_roms_grid(dset, t_coord=t_coord)
-
-
-def fourdim_crs_from_roms_grid(dset, t_coord=None):
-    horz_crs = HorzCRS.from_roms(dset)
-    vert_crs = VertCRS.from_roms(dset)
-    time_crs = TimeCRS.from_roms(dset, t_coord=t_coord)
-
-    return FourDimCRS(horz_crs, vert_crs, time_crs)
 
 
 @contextmanager

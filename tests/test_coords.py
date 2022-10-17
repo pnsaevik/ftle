@@ -348,3 +348,15 @@ class Test_FourDimCRS_from_roms_grid:
 
         posix2 = crs.posix(None, None, None, nptimes)
         assert posix2.tolist() == posix.tolist()
+
+    def test_can_specify_s_coords(self, dset):
+        crs = coords.FourDimCRS.from_roms_grid(dset, z_coord='S-coord')
+
+        x = np.array([0, 0, 1, 0])
+        y = np.array([0, 1, 1, 0])
+        s = np.array([-1, -1, -1, 0])  # Three bottom values and one surface value
+        depth = -dset.h.values[[0, 1, 1, 0], [0, 0, 1, 0]]
+        depth[-1] = 0
+
+        depth2 = crs.depth(x, y, s, None)
+        assert depth2.tolist() == depth.tolist()
