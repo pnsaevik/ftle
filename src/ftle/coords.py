@@ -192,6 +192,19 @@ class TimeCRS:
         else:
             return CFTimeCRS(ncatts['units'])
 
+    @staticmethod
+    def from_roms(dset, t_coord=None):
+        np_times = dset.ocean_time.values
+        if t_coord is None or t_coord == 'index':
+            time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
+        elif t_coord == 'posix':
+            time_crs = TimeCRS.from_array(np_times, numpy_to_posix(np_times))
+        elif t_coord == 'numpy':
+            time_crs = NumpyTimeCRS()
+        else:
+            raise ValueError(f'Unexpected t_coord value: {t_coord}')
+        return time_crs
+
 
 def numpy_to_posix(numpy_times):
     npdates = np.asarray(numpy_times).astype('datetime64[us]')
@@ -471,16 +484,7 @@ class FourDimTransform:
 def fourdim_crs_from_roms_grid(dset, t_coord=None):
     horz_crs = HorzCRS.from_roms(dset)
     vert_crs = VertCRS.from_roms(dset)
-
-    np_times = dset.ocean_time.values
-    if t_coord is None or t_coord == 'index':
-        time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
-    elif t_coord == 'posix':
-        time_crs = TimeCRS.from_array(np_times, numpy_to_posix(np_times))
-    elif t_coord == 'numpy':
-        time_crs = NumpyTimeCRS()
-    else:
-        raise ValueError(f'Unexpected t_coord value: {t_coord}')
+    time_crs = TimeCRS.from_roms(dset, t_coord=t_coord)
 
     return FourDimCRS(horz_crs, vert_crs, time_crs)
 
