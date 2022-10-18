@@ -409,6 +409,17 @@ class PlainVertCRS(VertCRS):
         return depth
 
 
+class NegativePlainVertCRS(VertCRS):
+    def __init__(self):
+        super().__init__()
+
+    def depth(self, x, y, z, t):
+        return -z
+
+    def z(self, x, y, depth, t):
+        return -depth
+
+
 class FourDimCRS:
     def __init__(self, horz_crs: HorzCRS, vert_crs: VertCRS, time_crs: TimeCRS):
         self.horz_crs = horz_crs
@@ -425,6 +436,14 @@ class FourDimCRS:
     def from_roms_grid(fname_or_dset, z_coord=None, t_coord=None):
         with open_file_or_dset(fname_or_dset) as dset:
             return fourdim_crs_from_roms_grid(dset, z_coord=z_coord, t_coord=t_coord)
+
+
+class PlainFourDimCRS(FourDimCRS):
+    def __init__(self):
+        horz_crs = PlainHorzCRS()
+        vert_crs = PlainVertCRS()
+        time_crs = PlainTimeCRS()
+        super().__init__(horz_crs, vert_crs, time_crs)
 
 
 def fourdim_crs_from_roms_grid(dset, z_coord=None, t_coord=None):

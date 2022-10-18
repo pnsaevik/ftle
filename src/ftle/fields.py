@@ -91,11 +91,21 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True, z_depth=False):
     else:
         data_vars = {**dict(dset.data_vars), **dict(dset.coords)}
 
+    # --- Start create coordinate transform
+    from . import coords
+    roms_crs = coords.fourdim_crs_from_roms_grid(dset, z_coord='index', t_coord='index')
+
     if z_depth:
-        from .coords import VertCRS
-        vert_crs = VertCRS.from_roms(dset)
+        input_vert_crs = coords.NegativePlainVertCRS()
     else:
-        vert_crs = None
+        input_vert_crs = roms_crs.vert_crs
+
+    input_horz_crs = roms_crs.horz_crs
+    input_time_crs = roms_crs.time_crs
+
+    input_crs = coords.FourDimCRS(input_horz_crs, input_vert_crs, input_time_crs)
+    trans = coords.FourDimTransform(input_crs, roms_crs).transform
+    # --- End create coordinate transform
 
     if posix_time and 'ocean_time' in data_vars:
         epoch = np.datetime64('1970-01-01', 'us')
@@ -110,10 +120,7 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True, z_depth=False):
         offset = {mappings[dim]: offsets[dim] for dim in v.dims if dim in offsets}
         nearest = nearests.get(k, ())
 
-        fn = get_interp_func_from_xr_data_array(v, mapping, offset, nearest)
-
-        if vert_crs is not None:
-            fn = _get_vtrans_function(fn, vert_crs)
+        fn = get_interp_func_from_xr_data_array(v, mapping, offset, nearest, trans)
 
         funcdict[k] = fn
 
@@ -128,7 +135,7 @@ def _get_vtrans_function(func, vtrans):
     return fn
 
 
-def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=()):
+def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=(), transform=None):
     """
     Create 4D interpolation function from grid variables
 
@@ -152,6 +159,10 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
     :param nearest: A subset of {'t', 'z', 'y', 'x'}. Specifies dimensions which should
     be interpolated using the `nearest` algorithm.
 
+    :param transform: A transform function fn(xx, yy, zz, tt) which returns a tuple
+    (x2, y2, z2, t2). The transform is applied to the input coordinates before
+    interpolation.
+
     :return: A function fn(t, z, y, x) which samples the array value at fractional
     coordinates.
     """
@@ -166,6 +177,9 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
         return {k: v + offset[k] if k in offset else v for k, v in coords_in.items()}
 
     def fn(t, z, y, x):
+        if transform is not None:
+            x, y, z, t = transform(xx=x, yy=y, zz=z, tt=t)
+
         coords = dict(x=mkvar(x), y=mkvar(y), z=mkvar(z), t=mkvar(t))
         coords = {k: coords[k] for k in darr.dims}
         if offset:
