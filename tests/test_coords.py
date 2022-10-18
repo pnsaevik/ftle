@@ -239,6 +239,31 @@ class Test_FourDimTransform:
         assert t2.tolist() == t.tolist()
 
 
+class Test_FourDimTransform_from_roms:
+    def test_plain_transform_if_standard_arguments(self, dset):
+        t, z, y, x = np.arange(4).reshape((4, 1))
+        trans = coords.FourDimTransform.from_roms(dset)
+        x2, y2, z2, t2 = trans.transform(x, y, z, t)
+        assert x2 == x
+        assert y2 == y
+        assert z2 == z
+        assert t2 == t
+
+    def test_can_specify_depth_input_coordinates(self, dset):
+        t, z, y, x = np.arange(4).reshape((4, 1))
+        trans = coords.FourDimTransform.from_roms(dset, z_coords='depth')
+        x2, y2, z2, t2 = trans.transform(x, y, z, t)
+        assert x2 == x
+        assert y2 == y
+        assert z2 != z
+        assert t2 == t
+
+        # The input z coordinate (z=1) is interpreted as a depth below surface, which
+        # is translated into grid coordinates as a number less than 35, which is the
+        # vertical layer count.
+        assert 31 < z2 < 32
+
+
 class Test_create_z_array:
     def test_correct_when_transform_2_explicit_stretching(self):
         y, x = np.meshgrid(range(2), range(3), indexing='ij')

@@ -509,6 +509,52 @@ class FourDimTransform:
 
         return x2, y2, z2, t2
 
+    @staticmethod
+    def from_roms(dset, xy_coords='index', z_coords='index', t_coords='index'):
+        """
+        Return a four dimensional transform onto a roms grid
+
+        :param dset: A ROMS dataset (xarray.Dataset)
+
+        :param xy_coords: ('index' or 'latlon') Horizontal input coordinate system.
+        - 'index': Use 'eta_rho' and 'xi_rho' as input coordinates. For instance, x = 0
+        means xi_rho = 0 and xi_u = -0.5, while x = 0.5 means xi_rho = 0.5 and xi_u = 0.
+        - 'latlon': Use latitude and longitude as input coordinates. For instance, x = 60
+        means a latitude of 60 degrees north, while y = -5 means a longitude of 5 degrees
+        west. Conversion between lat/lon and grid coordinates is done using linear
+        interpolation of the lat_rho and lon_rho arrays.
+
+        :param z_coords: ('index', 'depth' or 'S-coord') Vertical input coordinate system.
+        - 'index': Use 's_rho' as input coordinate. For instance, z = 0 means s_rho = 0
+        and s_w = 0.5, while z = -0.5 means s_rho = -0.5 and s_w = 0.
+        - 'depth': Use meters below surface as input coordinate. For instance, if the
+        total depth is 100, then z = 100 means s_rho = -0.5 and s_w = 0.
+
+        :param t_coords: ('index', 'posix' or 'numpy') Time input coordinate system.
+        - 'index': Use the index of 'ocean_time' as input coordinate. For instance, t = 0
+        means the first time index and t = 0.5 means the value halfway between the first
+        and second time indices.
+        - 'posix': Use the number of seconds since 1970-01-01 (disregarding leap seconds)
+        as input coordinate. For instance, t = 3600 is the date 1970-01-01T01.
+        - 'numpy': Use numpy dates as input coordinates.
+
+        :return: A FourDimTransform object representing the transform from input
+        coordinates to ROMS grid coordinates.
+        """
+        roms_crs = FourDimCRS.from_roms_grid(dset)
+
+        if z_coords == 'depth':
+            input_vert_crs = NegativePlainVertCRS()
+        else:
+            input_vert_crs = roms_crs.vert_crs
+
+        input_horz_crs = roms_crs.horz_crs
+        input_time_crs = roms_crs.time_crs
+
+        input_crs = FourDimCRS(input_horz_crs, input_vert_crs, input_time_crs)
+
+        return FourDimTransform(input_crs, roms_crs)
+
 
 @contextmanager
 def open_file_or_dset(d):

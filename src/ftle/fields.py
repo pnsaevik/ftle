@@ -59,9 +59,6 @@ class Fields:
         and s_w = 0.5, while z = -0.5 means s_rho = -0.5 and s_w = 0.
         - 'depth': Use meters below surface as input coordinate. For instance, if the
         total depth is 100, then z = 100 means s_rho = -0.5 and s_w = 0.
-        - 'S-coord': Use 's_w' as input coordinate, scaled so that the input value is
-        between -1 and 0. For instance, if the topmost vertical surface is s_w = 35,
-        then z = -1 means s_w = 0 and z = 0 means s_w = 35.
 
         :param t_coords: ('index', 'posix' or 'numpy') Time input coordinate system.
         - 'index': Use the index of 'ocean_time' as input coordinate. For instance, t = 0
@@ -95,22 +92,14 @@ def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index
     # Strip variables of coordinates to facilitate index-based interpolation
     data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
 
-    # --- Start create coordinate transform
-    from . import coords
-    roms_crs = coords.fourdim_crs_from_roms_grid(dset, z_coord='index', t_coord='index')
-
-    if z_coords == 'depth':
-        input_vert_crs = coords.NegativePlainVertCRS()
+    # Create four-dimensional transform object
+    from .coords import FourDimTransform
+    if {xy_coords, z_coords, t_coords} != {'index'}:
+        trans = FourDimTransform.from_roms(dset, xy_coords, z_coords, t_coords).transform
     else:
-        input_vert_crs = roms_crs.vert_crs
+        trans = None
 
-    input_horz_crs = roms_crs.horz_crs
-    input_time_crs = roms_crs.time_crs
-
-    input_crs = coords.FourDimCRS(input_horz_crs, input_vert_crs, input_time_crs)
-    trans = coords.FourDimTransform(input_crs, roms_crs).transform
-    # --- End create coordinate transform
-
+    # Create one interpolation function per variable
     for k, v in data_vars.items():
         mapping = {dim: mappings[dim] for dim in v.dims if dim in mappings}
         offset = {mappings[dim]: offsets[dim] for dim in v.dims if dim in offsets}
