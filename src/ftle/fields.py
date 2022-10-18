@@ -184,13 +184,32 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
         for k in nearest:
             coords[k] = np.round(coords[k])
 
-        return darr.interp(**coords)
+        darr_interp = darr.interp(**coords)
+
+        if dateconv:
+            darr_interp = xr.DataArray(
+                data=epoch + (one_sec * darr_interp.values).astype('timedelta64[ns]'),
+                coords=darr_interp.coords, dims=darr_interp.dims, name=darr_interp.name,
+                attrs=darr_interp.attrs,
+            )
+
+        return darr_interp
 
     def fn_singledim(t, z, y, x):
         v = next(vv for vv in (t, z, y, x) if vv.shape != ())
         return xr.broadcast(darr, xr.DataArray(mkvar(v)))[0]
 
-    fn.dtype = np.dtype('f8')
+    # If input array is a datetime, we must convert it to a number so that interpolation works
+    if np.issubdtype(darr.dtype, np.datetime64):
+        epoch = np.datetime64('1970-01-01').astype(darr.dtype)
+        one_sec = np.timedelta64(1, 's')
+        dateconv = True
+        darr = (darr - epoch) / one_sec
+        fn.dtype = np.dtype('datetime64[ns]')
+    else:
+        dateconv = False
+        fn.dtype = np.dtype('f8')
+
     fn_singledim.dtype = darr.dtype
 
     if darr.dims == ():

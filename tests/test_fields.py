@@ -11,7 +11,7 @@ FORCING_2 = Path(__file__).parent / 'forcing_2.nc'
 
 @pytest.fixture(scope='module')
 def forcing_1():
-    with xr.open_dataset(FORCING_1, decode_times=False) as dset:
+    with xr.open_dataset(FORCING_1) as dset:
         yield dset
 
 
@@ -220,6 +220,24 @@ class Test_get_interp_func_from_xr_data_array:
         assert fn(*coords).dtype == fn.dtype
         assert fn.dtype == np.dtype('f8')
 
+    def test_interpolates_datetime64_array(self):
+        y, z, t = np.zeros((3, 3))
+        x = np.array([0, 0.5, .75])
+        data = np.arange(2*3*4*5, dtype='f4').reshape((2, 3, 4, 5))
+        data = np.datetime64('1970-01-01') + data.astype('timedelta64[D]')
+        darr = xr.DataArray(data, dims=('t', 'z', 'y', 'x'))
+        fn = fields.get_interp_func_from_xr_data_array(darr)
+        assert fn(t, z, y, x).values.astype('datetime64[h]').astype(str).tolist() == [
+            '1970-01-01T00', '1970-01-01T12', '1970-01-01T18',
+        ]
+
+    def test_return_value_is_datetime64ns_if_input_is_datetime64(self, coords, darr):
+        epoch = np.datetime64('1970-01-01')
+        one_sec = np.timedelta64(1, 's')
+        fn = fields.get_interp_func_from_xr_data_array(epoch + one_sec * darr)
+        assert fn(*coords).dtype == fn.dtype
+        assert fn.dtype == np.dtype('datetime64[ns]')
+
     def test_interpolates_in_all_directions(self, darr):
         fn = fields.get_interp_func_from_xr_data_array(darr)
         zero = np.zeros(3)
@@ -281,3 +299,31 @@ class Test_get_interp_func_from_xr_data_array:
         assert result[0] == result[1]  # Constant when small x change
         assert result[0] != result[2]  # Nonconstant when big x change
         assert result[0] != result[3]  # Nonconstant when small y change
+
+    def test_accepts_transform(self, darr, coords):
+        t, z, y, x = coords
+
+        def negate(xx, yy, zz, tt):
+            return -xx, -yy, -zz, -tt
+
+        fn_1 = fields.get_interp_func_from_xr_data_array(darr)
+        fn_2 = fields.get_interp_func_from_xr_data_array(darr, transform=negate)
+
+        assert fn_1(t, z, y, x).values.tolist() == fn_2(-t, -z, -y, -x).values.tolist()
+
+    def test_returns_transformed_coordinates(self, darr, coords):
+        # The input coordinates are negative, but the output coordinates are positive
+
+        t, z, y, x = coords
+
+        def negate(xx, yy, zz, tt):
+            return -xx, -yy, -zz, -tt
+
+        fn_2 = fields.get_interp_func_from_xr_data_array(darr, transform=negate)
+
+        coords_2 = fn_2(-t, -z, -y, -x).coords
+
+        assert coords_2['x'].values.tolist() == x.tolist()
+        assert coords_2['y'].values.tolist() == y.tolist()
+        assert coords_2['z'].values.tolist() == z.tolist()
+        assert coords_2['t'].values.tolist() == t.tolist()
