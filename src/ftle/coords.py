@@ -563,7 +563,12 @@ class FourDimTransform:
         else:
             raise ValueError(f'Unexpected value of z_coords: {z_coords}')
 
-        input_time_crs = roms_crs.time_crs
+        if t_coords == 'index':
+            input_time_crs = roms_crs.time_crs
+        elif t_coords == 'posix':
+            input_time_crs = PlainTimeCRS()
+        else:
+            raise ValueError(f'Unexpected value of t_coords: {t_coords}')
 
         input_crs = FourDimCRS(input_horz_crs, input_vert_crs, input_time_crs)
 

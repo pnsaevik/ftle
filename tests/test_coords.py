@@ -275,6 +275,21 @@ class Test_FourDimTransform_from_roms:
         assert z2.tolist() == z.tolist()
         assert t2.tolist() == t.tolist()
 
+    def test_can_specify_posix_input_coordinates(self, dset):
+        epoch = np.datetime64('1970-01-01')
+        one_sec = np.timedelta64(1, 's')
+
+        x, y, z = np.zeros((3, 3))
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = (nptimes - epoch) / one_sec
+
+        trans = coords.FourDimTransform.from_roms(dset, t_coords='posix')
+
+        x2, y2, z2, t2 = trans.transform(x, y, z, posix)
+
+        assert t2.tolist() == t.tolist()
+
 
 class Test_create_z_array:
     def test_correct_when_transform_2_explicit_stretching(self):
