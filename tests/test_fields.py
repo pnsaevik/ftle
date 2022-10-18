@@ -11,7 +11,7 @@ FORCING_2 = Path(__file__).parent / 'forcing_2.nc'
 
 @pytest.fixture(scope='module')
 def forcing_1():
-    with xr.open_dataset(FORCING_1) as dset:
+    with xr.open_dataset(FORCING_1, decode_times=False) as dset:
         yield dset
 
 

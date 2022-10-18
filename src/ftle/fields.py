@@ -111,12 +111,6 @@ def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index
     trans = coords.FourDimTransform(input_crs, roms_crs).transform
     # --- End create coordinate transform
 
-    # Convert to posix time
-    epoch = np.datetime64('1970-01-01', 'us')
-    one_sec = np.timedelta64(1000000, 'us')
-    posix = (data_vars['ocean_time'] - epoch) / one_sec
-    data_vars['ocean_time'] = posix
-
     for k, v in data_vars.items():
         mapping = {dim: mappings[dim] for dim in v.dims if dim in mappings}
         offset = {mappings[dim]: offsets[dim] for dim in v.dims if dim in offsets}
