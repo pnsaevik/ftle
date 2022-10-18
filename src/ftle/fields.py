@@ -46,11 +46,11 @@ class Fields:
 
         :param dset: A ROMS dataset (xarray.Dataset)
 
-        :param xy_coords: ('index' or 'latlon') Horizontal input coordinate system.
+        :param xy_coords: ('index' or 'lonlat') Horizontal input coordinate system.
         - 'index': Use 'eta_rho' and 'xi_rho' as input coordinates. For instance, x = 0
         means xi_rho = 0 and xi_u = -0.5, while x = 0.5 means xi_rho = 0.5 and xi_u = 0.
-        - 'latlon': Use latitude and longitude as input coordinates. For instance, x = 60
-        means a latitude of 60 degrees north, while y = -5 means a longitude of 5 degrees
+        - 'lonlat': Use longitude and latitude as input coordinates. For instance, y = 60
+        means a latitude of 60 degrees north, while x = -5 means a longitude of 5 degrees
         west. Conversion between lat/lon and grid coordinates is done using linear
         interpolation of the lat_rho and lon_rho arrays.
 

@@ -101,7 +101,10 @@ class HorzCRS:
 
     @staticmethod
     def from_name(name):
-        return PyprojHorzCRS(named_crs(name))
+        if isinstance('name', str) and name == 'lonlat':
+            return LonLatHorzCRS()
+        else:
+            return PyprojHorzCRS(named_crs(name))
 
     @staticmethod
     def from_array(lat, lon):
@@ -121,6 +124,17 @@ class PlainHorzCRS(HorzCRS):
 
     def xy(self, lat, lon, z, t):
         return lat, lon
+
+
+class LonLatHorzCRS(HorzCRS):
+    def __init__(self):
+        super().__init__()
+
+    def latlon(self, x, y, z, t):
+        return y, x
+
+    def xy(self, lat, lon, z, t):
+        return lon, lat
 
 
 class ArrayHorzCRS(HorzCRS):
@@ -438,14 +452,6 @@ class FourDimCRS:
             return fourdim_crs_from_roms_grid(dset, z_coord=z_coord, t_coord=t_coord)
 
 
-class PlainFourDimCRS(FourDimCRS):
-    def __init__(self):
-        horz_crs = PlainHorzCRS()
-        vert_crs = PlainVertCRS()
-        time_crs = PlainTimeCRS()
-        super().__init__(horz_crs, vert_crs, time_crs)
-
-
 def fourdim_crs_from_roms_grid(dset, z_coord=None, t_coord=None):
     horz_crs = HorzCRS.from_roms(dset)
     vert_crs = VertCRS.from_roms(dset, z_coord=z_coord)
@@ -516,11 +522,11 @@ class FourDimTransform:
 
         :param dset: A ROMS dataset (xarray.Dataset)
 
-        :param xy_coords: ('index' or 'latlon') Horizontal input coordinate system.
+        :param xy_coords: ('index' or 'lonlat') Horizontal input coordinate system.
         - 'index': Use 'eta_rho' and 'xi_rho' as input coordinates. For instance, x = 0
         means xi_rho = 0 and xi_u = -0.5, while x = 0.5 means xi_rho = 0.5 and xi_u = 0.
-        - 'latlon': Use latitude and longitude as input coordinates. For instance, x = 60
-        means a latitude of 60 degrees north, while y = -5 means a longitude of 5 degrees
+        - 'lonlat': Use longitude and latitude as input coordinates. For instance, y = 60
+        means a latitude of 60 degrees north, while x = -5 means a longitude of 5 degrees
         west. Conversion between lat/lon and grid coordinates is done using linear
         interpolation of the lat_rho and lon_rho arrays.
 
@@ -543,12 +549,20 @@ class FourDimTransform:
         """
         roms_crs = FourDimCRS.from_roms_grid(dset)
 
-        if z_coords == 'depth':
+        if xy_coords == 'index':
+            input_horz_crs = roms_crs.horz_crs
+        elif xy_coords == 'lonlat':
+            input_horz_crs = LonLatHorzCRS()
+        else:
+            raise ValueError(f'Unexpected value of xy_coords: {xy_coords}')
+
+        if z_coords == 'index':
+            input_vert_crs = roms_crs.vert_crs
+        elif z_coords == 'depth':
             input_vert_crs = NegativePlainVertCRS()
         else:
-            input_vert_crs = roms_crs.vert_crs
+            raise ValueError(f'Unexpected value of z_coords: {z_coords}')
 
-        input_horz_crs = roms_crs.horz_crs
         input_time_crs = roms_crs.time_crs
 
         input_crs = FourDimCRS(input_horz_crs, input_vert_crs, input_time_crs)

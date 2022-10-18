@@ -263,6 +263,18 @@ class Test_FourDimTransform_from_roms:
         # vertical layer count.
         assert 31 < z2 < 32
 
+    def test_can_specify_lonlat_input_coordinates(self, dset):
+        trans = coords.FourDimTransform.from_roms(dset, xy_coords='lonlat')
+        x = dset.lon_rho.values[[5, 6, 7], [0, 1, 2]]
+        y = dset.lat_rho.values[[5, 6, 7], [0, 1, 2]]
+        z = np.array([0, 0, 0])
+        t = np.array([0, 0, 0])
+        x2, y2, z2, t2 = trans.transform(x, y, z, t)
+        assert x2.round(decimals=2).tolist() == [0, 1, 2]
+        assert y2.round(decimals=2).tolist() == [5, 6, 7]
+        assert z2.tolist() == z.tolist()
+        assert t2.tolist() == t.tolist()
+
 
 class Test_create_z_array:
     def test_correct_when_transform_2_explicit_stretching(self):
