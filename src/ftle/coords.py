@@ -567,6 +567,8 @@ class FourDimTransform:
             input_time_crs = roms_crs.time_crs
         elif t_coords == 'posix':
             input_time_crs = PlainTimeCRS()
+        elif t_coords == 'numpy':
+            input_time_crs = NumpyTimeCRS()
         else:
             raise ValueError(f'Unexpected value of t_coords: {t_coords}')
 

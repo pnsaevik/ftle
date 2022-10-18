@@ -162,6 +162,21 @@ class Test_CFTimeCRS:
         ]
 
 
+class Test_NumpyTimeCRS:
+    def test_can_compute_posix(self):
+        crs = coords.NumpyTimeCRS()
+        t = np.array(['1970-01-01', '1970-01-01T01']).astype('datetime64[h]')
+        assert crs.posix(None, None, None, t).tolist() == [0, 3600]
+
+    def test_returns_datetime64us_when_converting_from_posix(self):
+        crs = coords.NumpyTimeCRS()
+        posix = np.array([0, 3600])
+        t = crs.t(None, None, None, posix)
+        assert t.astype(str).tolist() == [
+            '1970-01-01T00:00:00.000000', '1970-01-01T01:00:00.000000'
+        ]
+
+
 class Test_FourDimTransform:
     def test_correct_when_only_horz_transform(self):
         plain_time_crs = coords.PlainTimeCRS()
@@ -287,6 +302,20 @@ class Test_FourDimTransform_from_roms:
         trans = coords.FourDimTransform.from_roms(dset, t_coords='posix')
 
         x2, y2, z2, t2 = trans.transform(x, y, z, posix)
+
+        assert t2.tolist() == t.tolist()
+
+    def test_can_specify_numpy_input_coordinates(self, dset):
+        epoch = np.datetime64('1970-01-01')
+        one_sec = np.timedelta64(1, 's')
+
+        x, y, z = np.zeros((3, 3))
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+
+        trans = coords.FourDimTransform.from_roms(dset, t_coords='numpy')
+
+        x2, y2, z2, t2 = trans.transform(x, y, z, nptimes)
 
         assert t2.tolist() == t.tolist()
 
