@@ -155,7 +155,7 @@ class Test_Fields_from_roms_dataset:
         assert result[0] != result[2]
 
     def test_can_interpolate_using_depth(self, forcing_1):
-        f_zdepth = fields.Fields.from_roms_dataset(forcing_1, z_depth=True)
+        f_zdepth = fields.Fields.from_roms_dataset(forcing_1, z_coords='depth')
         f_regular = fields.Fields.from_roms_dataset(forcing_1)
         t = np.array([0, 0, 0, 0])
         z = np.array([-.5, 0, .5, forcing_1.dims['s_rho'] - .5])

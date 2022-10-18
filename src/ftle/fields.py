@@ -40,62 +40,66 @@ class Fields:
         return Fields(funcdict)
 
     @staticmethod
-    def from_roms_dataset(dset, remove_coords=True, posix_time=True, z_depth=False):
+    def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index'):
         """
         Create Fields object from ROMS dataset
 
         :param dset: A ROMS dataset (xarray.Dataset)
 
-        :param remove_coords: True if interpolation should take fractional zero-based
-        indices as input instead of dataset coordinates (default = True)
+        :param xy_coords: ('index' or 'latlon') Horizontal input coordinate system.
+        - 'index': Use 'eta_rho' and 'xi_rho' as input coordinates. For instance, x = 0
+        means xi_rho = 0 and xi_u = -0.5, while x = 0.5 means xi_rho = 0.5 and xi_u = 0.
+        - 'latlon': Use latitude and longitude as input coordinates. For instance, x = 60
+        means a latitude of 60 degrees north, while y = -5 means a longitude of 5 degrees
+        west. Conversion between lat/lon and grid coordinates is done using linear
+        interpolation of the lat_rho and lon_rho arrays.
 
-        :param posix_time: True if the time variable should be converted to posix
-        timestamps (default = True)
+        :param z_coords: ('index', 'depth' or 'S-coord') Vertical input coordinate system.
+        - 'index': Use 's_rho' as input coordinate. For instance, z = 0 means s_rho = 0
+        and s_w = 0.5, while z = -0.5 means s_rho = -0.5 and s_w = 0.
+        - 'depth': Use meters below surface as input coordinate. For instance, if the
+        total depth is 100, then z = 100 means s_rho = -0.5 and s_w = 0.
+        - 'S-coord': Use 's_w' as input coordinate, scaled so that the input value is
+        between -1 and 0. For instance, if the topmost vertical surface is s_w = 35,
+        then z = -1 means s_w = 0 and z = 0 means s_w = 35.
 
-        :param z_depth: True if interpolation should take depth as input instead of
-        S-coordinates (default = False)
+        :param t_coords: ('index', 'posix' or 'numpy') Time input coordinate system.
+        - 'index': Use the index of 'ocean_time' as input coordinate. For instance, t = 0
+        means the first time index and t = 0.5 means the value halfway between the first
+        and second time indices.
+        - 'posix': Use the number of seconds since 1970-01-01 (disregarding leap seconds)
+        as input coordinate. For instance, t = 3600 is the date 1970-01-01T01.
+        - 'numpy': Use numpy dates as input coordinates.
 
         :return: A Fields object
         """
-        return from_roms_dataset(dset, remove_coords, posix_time, z_depth)
+        return from_roms_dataset(dset, xy_coords, z_coords, t_coords)
 
 
-def from_roms_dataset(dset, remove_coords=True, posix_time=True, z_depth=False):
+def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index'):
+    # The output dict of interpolation functions
     funcdict = dict()
 
+    # Conversion between roms names and coordinate names
     mappings = dict(
-        s_rho='z',
-        s_w='z',
-        eta_rho='y',
-        xi_rho='x',
-        eta_u='y',
-        xi_u='x',
-        eta_v='y',
-        xi_v='x',
-        ocean_time='t',
+        s_rho='z', s_w='z', eta_rho='y', xi_rho='x', eta_u='y', xi_u='x', eta_v='y',
+        xi_v='x', ocean_time='t',
     )
 
-    offsets = dict(
-        s_w=0.5,
-        xi_u=-0.5,
-        eta_v=-0.5,
-    )
+    # Off-by-one-half corrections for variables that are defined on grid faces
+    offsets = dict(s_w=0.5, xi_u=-0.5, eta_v=-0.5)
 
-    nearests = dict(
-        u={'y'},
-        v={'x'},
-    )
+    # Use nearest neighbour interpolation in lateral direction for horizontal velocities
+    nearests = dict(u={'y'}, v={'x'})
 
-    if remove_coords:
-        data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
-    else:
-        data_vars = {**dict(dset.data_vars), **dict(dset.coords)}
+    # Strip variables of coordinates to facilitate index-based interpolation
+    data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
 
     # --- Start create coordinate transform
     from . import coords
     roms_crs = coords.fourdim_crs_from_roms_grid(dset, z_coord='index', t_coord='index')
 
-    if z_depth:
+    if z_coords == 'depth':
         input_vert_crs = coords.NegativePlainVertCRS()
     else:
         input_vert_crs = roms_crs.vert_crs
@@ -107,13 +111,11 @@ def from_roms_dataset(dset, remove_coords=True, posix_time=True, z_depth=False):
     trans = coords.FourDimTransform(input_crs, roms_crs).transform
     # --- End create coordinate transform
 
-    if posix_time and 'ocean_time' in data_vars:
-        epoch = np.datetime64('1970-01-01', 'us')
-        one_sec = np.timedelta64(1000000, 'us')
-        posix = (data_vars['ocean_time'] - epoch) / one_sec
-        if not remove_coords:
-            posix.coords['ocean_time'] = posix.variable
-        data_vars['ocean_time'] = posix
+    # Convert to posix time
+    epoch = np.datetime64('1970-01-01', 'us')
+    one_sec = np.timedelta64(1000000, 'us')
+    posix = (data_vars['ocean_time'] - epoch) / one_sec
+    data_vars['ocean_time'] = posix
 
     for k, v in data_vars.items():
         mapping = {dim: mappings[dim] for dim in v.dims if dim in mappings}
