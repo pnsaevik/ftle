@@ -56,89 +56,89 @@ class Test_Fields_from_roms_dataset:
         y = np.array([3, 3.5, 4])
         z = np.array([5, 5.5, 6])
         t = np.array([0, 0.5, 1])
-        return t, z, y, x
+        return x, y, z, t
 
     @pytest.fixture(scope='class')
     def fields_1(self, forcing_1):
         return fields.Fields.from_roms_dataset(forcing_1)
 
-    def test_variables_with_no_dims(self, fields_1, coords):
+    def test_correct_interpolation_when_variables_with_no_dims(self, fields_1, coords):
         func = fields_1['hc']
         result = func(*coords)
         assert result.mean() == result[1]
         assert not np.isnan(result.mean())
 
-    def test_variables_with_dims_zrho(self, fields_1, coords):
-        t, z, y, x = coords
+    def test_correct_interpolation_when_variables_with_dims_zrho(self, fields_1, coords):
+        x, y, z, t = coords
         z = np.array([-1.0, -.5, 0])
 
         func = fields_1['Cs_r']
-        result = func(t, z, y, x)
+        result = func(x, y, z, t)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, True, False]
 
-    def test_variables_with_dims_zw(self, fields_1, coords):
-        t, z, y, x = coords
+    def test_correct_interpolation_when_variables_with_dims_zw(self, fields_1, coords):
+        x, y, z, t = coords
         z = np.array([-1.0, -.5, 0])
 
         func = fields_1['Cs_w']
-        result = func(t, z, y, x)
+        result = func(x, y, z, t)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, False, False]
 
-    def test_variables_with_dims_time(self, fields_1, coords):
-        t, z, y, x = coords
+    def test_correct_interpolation_when_variables_with_dims_time(self, fields_1, coords):
+        x, y, z, t = coords
         t = np.array([-.5, 0, 0.5])
 
         func = fields_1['ocean_time']
-        result = func(t, z, y, x)
+        result = func(x, y, z, t)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, False, False]
 
-    def test_variables_with_dims_etarho_xirho(self, fields_1, coords):
-        t, z, y, x = coords
+    def test_correct_interpolation_when_variables_with_dims_etarho_xirho(self, fields_1, coords):
+        x, y, z, t = coords
         y = np.array([-.5, 0, 0])
         x = np.array([0, -.5, 0])
 
         func = fields_1['h']
-        result = func(t, z, y, x)
+        result = func(x, y, z, t)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, True, False]
 
-    def test_variables_with_dims_time_etarho_xirho(self, fields_1, coords):
+    def test_correct_interpolation_when_variables_with_dims_time_etarho_xirho(self, fields_1, coords):
         func = fields_1['zeta']
         result = func(*coords)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
 
-    def test_variables_with_fourdims_rho(self, fields_1, coords):
+    def test_correct_interpolation_when_variables_with_fourdims_rho(self, fields_1, coords):
         func = fields_1['temp']
         result = func(*coords)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
 
-    def test_boundaries_of_variable_u(self, fields_1, coords):
-        t, z, y, x = coords
+    def test_correct_boundaries_of_variable_u(self, fields_1, coords):
+        x, y, z, t = coords
         y = np.array([-1, -.5, -.5])
         x = np.array([0.5, 0, 0.5])
 
         func = fields_1['u']
-        result = func(t, z, y, x)
+        result = func(x, y, z, t)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, True, False]
 
-    def test_boundaries_of_variable_v(self, fields_1, coords):
-        t, z, y, x = coords
+    def test_correct_boundaries_of_variable_v(self, fields_1, coords):
+        x, y, z, t = coords
         y = np.array([0.5, 0, 0.5])
         x = np.array([-1, -.5, -.5])
 
         func = fields_1['v']
-        result = func(t, z, y, x)
+        result = func(x, y, z, t)
         assert result.shape == (len(coords[0]), )
         assert result.dtype == func.dtype
         assert np.array(np.isnan(result)).tolist() == [True, True, False]
@@ -150,12 +150,12 @@ class Test_Fields_from_roms_dataset:
         t = np.zeros_like(x)
 
         func = fields_1['u']
-        result = func(t, z, y, x)
+        result = func(x, y, z, t)
         assert result[0] == result[1]
         assert result[0] != result[2]
 
     def test_can_interpolate_using_depth(self, forcing_1):
-        f_zdepth = fields.Fields.from_roms_dataset(forcing_1, z_depth=True)
+        f_zdepth = fields.Fields.from_roms_dataset(forcing_1, z_coords='depth')
         f_regular = fields.Fields.from_roms_dataset(forcing_1)
         t = np.array([0, 0, 0, 0])
         z = np.array([-.5, 0, .5, forcing_1.dims['s_rho'] - .5])
@@ -165,8 +165,8 @@ class Test_Fields_from_roms_dataset:
         fn_zdepth = f_zdepth['Cs_w']
         fn_regular = f_regular['Cs_w']
 
-        result_zdepth = fn_zdepth(t, z, y, x)
-        result_regular = fn_regular(t, z, y, x)
+        result_zdepth = fn_zdepth(x, y, z, t)
+        result_regular = fn_regular(x, y, z, t)
 
         # Regular[-.5]: Ocean floor
         assert result_regular[0] == -1
@@ -200,14 +200,14 @@ class Test_get_interp_func_from_xr_data_array:
         y = np.array([.4, .5, .6])
         z = np.array([.7, .8, .9])
         t = np.array([1.0] * len(x))
-        return t, z, y, x
+        return x, y, z, t
 
     @pytest.fixture(scope='class')
     def darr(self):
         data = np.arange(2*3*4*5, dtype='f4').reshape((2, 3, 4, 5))
         return xr.DataArray(data, dims=('t', 'z', 'y', 'x'))
 
-    def test_returns_callable(self, coords, darr):
+    def test_returns_callable(self, darr):
         fn = fields.get_interp_func_from_xr_data_array(darr)
         assert callable(fn)
 
@@ -219,6 +219,24 @@ class Test_get_interp_func_from_xr_data_array:
         fn = fields.get_interp_func_from_xr_data_array(darr)
         assert fn(*coords).dtype == fn.dtype
         assert fn.dtype == np.dtype('f8')
+
+    def test_interpolates_datetime64_array(self):
+        y, z, t = np.zeros((3, 3))
+        x = np.array([0, 0.5, .75])
+        data = np.arange(2*3*4*5, dtype='f4').reshape((2, 3, 4, 5))
+        data = np.datetime64('1970-01-01') + data.astype('timedelta64[D]')
+        darr = xr.DataArray(data, dims=('t', 'z', 'y', 'x'))
+        fn = fields.get_interp_func_from_xr_data_array(darr)
+        assert fn(x, y, z, t).values.astype('datetime64[h]').astype(str).tolist() == [
+            '1970-01-01T00', '1970-01-01T12', '1970-01-01T18',
+        ]
+
+    def test_return_value_is_datetime64ns_if_input_is_datetime64(self, coords, darr):
+        epoch = np.datetime64('1970-01-01')
+        one_sec = np.timedelta64(1, 's')
+        fn = fields.get_interp_func_from_xr_data_array(epoch + one_sec * darr)
+        assert fn(*coords).dtype == fn.dtype
+        assert fn.dtype == np.dtype('datetime64[ns]')
 
     def test_interpolates_in_all_directions(self, darr):
         fn = fields.get_interp_func_from_xr_data_array(darr)
@@ -260,8 +278,9 @@ class Test_get_interp_func_from_xr_data_array:
         assert list(fn_roms(*coords)) == list(fn_regular(*coords))
 
     def test_accepts_offset(self, coords, darr):
+        x, y, z, t = coords
         offset = dict(t=-100)
-        coords2 = (coords[0] + 100, ) + coords[1:]
+        coords2 = (x, y, z, t + 100)
         fn_offset = fields.get_interp_func_from_xr_data_array(darr, offset=offset)
         fn_regular = fields.get_interp_func_from_xr_data_array(darr)
         assert list(fn_regular(*coords)) == list(fn_offset(*coords2))
@@ -276,8 +295,36 @@ class Test_get_interp_func_from_xr_data_array:
         t = np.zeros_like(x)
 
         fn = fields.get_interp_func_from_xr_data_array(darr, nearest=nearest)
-        result = fn(t, z, y, x)
+        result = fn(x, y, z, t)
 
         assert result[0] == result[1]  # Constant when small x change
         assert result[0] != result[2]  # Nonconstant when big x change
         assert result[0] != result[3]  # Nonconstant when small y change
+
+    def test_accepts_transform(self, darr, coords):
+        x, y, z, t = coords
+
+        def negate(xx, yy, zz, tt):
+            return -xx, -yy, -zz, -tt
+
+        fn_1 = fields.get_interp_func_from_xr_data_array(darr)
+        fn_2 = fields.get_interp_func_from_xr_data_array(darr, transform=negate)
+
+        assert fn_1(x, y, z, t).values.tolist() == fn_2(-x, -y, -z, -t).values.tolist()
+
+    def test_returns_transformed_coordinates(self, darr, coords):
+        # The input coordinates are negative, but the output coordinates are positive
+
+        x, y, z, t = coords
+
+        def negate(xx, yy, zz, tt):
+            return -xx, -yy, -zz, -tt
+
+        fn_2 = fields.get_interp_func_from_xr_data_array(darr, transform=negate)
+
+        coords_2 = fn_2(-x, -y, -z, -t).coords
+
+        assert coords_2['x'].values.tolist() == x.tolist()
+        assert coords_2['y'].values.tolist() == y.tolist()
+        assert coords_2['z'].values.tolist() == z.tolist()
+        assert coords_2['t'].values.tolist() == t.tolist()

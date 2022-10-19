@@ -162,6 +162,21 @@ class Test_CFTimeCRS:
         ]
 
 
+class Test_NumpyTimeCRS:
+    def test_can_compute_posix(self):
+        crs = coords.NumpyTimeCRS()
+        t = np.array(['1970-01-01', '1970-01-01T01']).astype('datetime64[h]')
+        assert crs.posix(None, None, None, t).tolist() == [0, 3600]
+
+    def test_returns_datetime64us_when_converting_from_posix(self):
+        crs = coords.NumpyTimeCRS()
+        posix = np.array([0, 3600])
+        t = crs.t(None, None, None, posix)
+        assert t.astype(str).tolist() == [
+            '1970-01-01T00:00:00.000000', '1970-01-01T01:00:00.000000'
+        ]
+
+
 class Test_FourDimTransform:
     def test_correct_when_only_horz_transform(self):
         plain_time_crs = coords.PlainTimeCRS()
@@ -236,6 +251,72 @@ class Test_FourDimTransform:
         assert x2.tolist() == x.tolist()
         assert y2.tolist() == y.tolist()
         assert z2.tolist() == [0, .25, .5, .75, 1]
+        assert t2.tolist() == t.tolist()
+
+
+class Test_FourDimTransform_from_roms:
+    def test_plain_transform_if_standard_arguments(self, dset):
+        t, z, y, x = np.arange(4).reshape((4, 1))
+        trans = coords.FourDimTransform.from_roms(dset)
+        x2, y2, z2, t2 = trans.transform(x, y, z, t)
+        assert x2 == x
+        assert y2 == y
+        assert z2 == z
+        assert t2 == t
+
+    def test_can_specify_depth_input_coordinates(self, dset):
+        t, z, y, x = np.arange(4).reshape((4, 1))
+        trans = coords.FourDimTransform.from_roms(dset, z_coords='depth')
+        x2, y2, z2, t2 = trans.transform(x, y, z, t)
+        assert x2 == x
+        assert y2 == y
+        assert z2 != z
+        assert t2 == t
+
+        # The input z coordinate (z=1) is interpreted as a depth below surface, which
+        # is translated into grid coordinates as a number less than 35, which is the
+        # vertical layer count.
+        assert 31 < z2 < 32
+
+    def test_can_specify_lonlat_input_coordinates(self, dset):
+        trans = coords.FourDimTransform.from_roms(dset, xy_coords='lonlat')
+        x = dset.lon_rho.values[[5, 6, 7], [0, 1, 2]]
+        y = dset.lat_rho.values[[5, 6, 7], [0, 1, 2]]
+        z = np.array([0, 0, 0])
+        t = np.array([0, 0, 0])
+        x2, y2, z2, t2 = trans.transform(x, y, z, t)
+        assert x2.round(decimals=2).tolist() == [0, 1, 2]
+        assert y2.round(decimals=2).tolist() == [5, 6, 7]
+        assert z2.tolist() == z.tolist()
+        assert t2.tolist() == t.tolist()
+
+    def test_can_specify_posix_input_coordinates(self, dset):
+        epoch = np.datetime64('1970-01-01')
+        one_sec = np.timedelta64(1, 's')
+
+        x, y, z = np.zeros((3, 3))
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = (nptimes - epoch) / one_sec
+
+        trans = coords.FourDimTransform.from_roms(dset, t_coords='posix')
+
+        x2, y2, z2, t2 = trans.transform(x, y, z, posix)
+
+        assert t2.tolist() == t.tolist()
+
+    def test_can_specify_numpy_input_coordinates(self, dset):
+        epoch = np.datetime64('1970-01-01')
+        one_sec = np.timedelta64(1, 's')
+
+        x, y, z = np.zeros((3, 3))
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+
+        trans = coords.FourDimTransform.from_roms(dset, t_coords='numpy')
+
+        x2, y2, z2, t2 = trans.transform(x, y, z, nptimes)
+
         assert t2.tolist() == t.tolist()
 
 
@@ -327,3 +408,36 @@ class Test_FourDimCRS_from_roms_grid:
 
         t2 = crs.t(None, None, None, posix)
         assert t2.tolist() == t.tolist()
+
+    def test_can_specify_posix_t_coord(self, dset):
+        crs = coords.FourDimCRS.from_roms_grid(dset, t_coord='posix')
+
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = coords.numpy_to_posix(nptimes)
+
+        # Input is posix, output is posix
+        posix2 = crs.posix(None, None, None, posix)
+        assert posix2.tolist() == posix.tolist()
+
+    def test_can_specify_numpy_t_coord(self, dset):
+        crs = coords.FourDimCRS.from_roms_grid(dset, t_coord='numpy')
+
+        t = np.array([0, 1, 2])
+        nptimes = dset.ocean_time.values[t]
+        posix = coords.numpy_to_posix(nptimes)
+
+        posix2 = crs.posix(None, None, None, nptimes)
+        assert posix2.tolist() == posix.tolist()
+
+    def test_can_specify_s_coords(self, dset):
+        crs = coords.FourDimCRS.from_roms_grid(dset, z_coord='S-coord')
+
+        x = np.array([0, 0, 1, 0])
+        y = np.array([0, 1, 1, 0])
+        s = np.array([-1, -1, -1, 0])  # Three bottom values and one surface value
+        depth = -dset.h.values[[0, 1, 1, 0], [0, 0, 1, 0]]
+        depth[-1] = 0
+
+        depth2 = crs.depth(x, y, s, None)
+        assert depth2.tolist() == depth.tolist()

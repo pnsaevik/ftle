@@ -1,11 +1,9 @@
-import cftime
-import pyproj
-from scipy.ndimage import map_coordinates
-import numpy as np
 from contextlib import contextmanager
+import numpy as np
 
 
 def named_crs(name):
+    import pyproj
     proj_strings = dict(
         svim="+proj=stere +R=6371000.0 +lat_0=90 +lat_ts=60 +lon_0=58 +x_0=3988000 +y_0=2548000 +to_meter=4000",
         nk800="+proj=stere +lat_0=90 +lat_ts=60 +lon_0=70 +x_0=3192800 +y_0=1784000 +ellps=WGS84 +to_meter=800",
@@ -101,7 +99,10 @@ class HorzCRS:
 
     @staticmethod
     def from_name(name):
-        return PyprojHorzCRS(named_crs(name))
+        if isinstance('name', str) and name == 'lonlat':
+            return LonLatHorzCRS()
+        else:
+            return PyprojHorzCRS(named_crs(name))
 
     @staticmethod
     def from_array(lat, lon):
@@ -123,6 +124,17 @@ class PlainHorzCRS(HorzCRS):
         return lat, lon
 
 
+class LonLatHorzCRS(HorzCRS):
+    def __init__(self):
+        super().__init__()
+
+    def latlon(self, x, y, z, t):
+        return y, x
+
+    def xy(self, lat, lon, z, t):
+        return lon, lat
+
+
 class ArrayHorzCRS(HorzCRS):
     """A horizontal coordinate system based on a set of lat/lon arrays"""
     def __init__(self, lat, lon):
@@ -140,6 +152,7 @@ class ArrayHorzCRS(HorzCRS):
         self.lon = lon
 
     def latlon(self, x, y, z, t):
+        from scipy.ndimage import map_coordinates
         lat = map_coordinates(self.lat, [y, x], order=1)
         lon = map_coordinates(self.lon, [y, x], order=1)
         return lat, lon
@@ -156,6 +169,7 @@ class PyprojHorzCRS(HorzCRS):
         self._latlon_transform = None
 
     def _get_latlon_transform(self):
+        import pyproj
         if self._latlon_transform is None:
             wgs84 = pyproj.CRS.from_epsg(4326)
             self._latlon_transform = pyproj.Transformer.from_crs(self.crs, wgs84)
@@ -192,6 +206,19 @@ class TimeCRS:
         else:
             return CFTimeCRS(ncatts['units'])
 
+    @staticmethod
+    def from_roms(dset, t_coord=None):
+        np_times = dset.ocean_time.values
+        if t_coord is None or t_coord == 'index':
+            time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
+        elif t_coord == 'posix':
+            time_crs = TimeCRS.from_array(np_times, numpy_to_posix(np_times))
+        elif t_coord == 'numpy':
+            time_crs = NumpyTimeCRS()
+        else:
+            raise ValueError(f'Unexpected t_coord value: {t_coord}')
+        return time_crs
+
 
 def numpy_to_posix(numpy_times):
     npdates = np.asarray(numpy_times).astype('datetime64[us]')
@@ -216,6 +243,20 @@ class ArrayTimeCRS(TimeCRS):
         from scipy.interpolate import UnivariateSpline
         self._interp_fwd = UnivariateSpline(self._posix, t, k=1, s=0, ext=0)
         self._interp_bwd = UnivariateSpline(t, self._posix, k=1, s=0, ext=0)
+
+    def posix(self, x, y, z, t):
+        return self._interp_bwd(t)
+
+    def t(self, x, y, z, posix):
+        return self._interp_fwd(posix)
+
+
+class NumpyTimeCRS(TimeCRS):
+    def __init__(self):
+        super().__init__()
+
+        self._interp_fwd = posix_to_numpy
+        self._interp_bwd = numpy_to_posix
 
     def posix(self, x, y, z, t):
         return self._interp_bwd(t)
@@ -254,6 +295,7 @@ class CFTimeCRS(TimeCRS):
         return numpy_to_posix(npdates)
 
     def t(self, x, y, z, posix):
+        import cftime
         pydates = posix_to_numpy(posix).astype(object)
         return cftime.date2num(dates=pydates, units=self.units, calendar=self.calendar)
 
@@ -292,10 +334,17 @@ class VertCRS:
         return ArrayVertCRS(depth, z)
 
     @staticmethod
-    def from_roms(dset):
-        depth_array = create_depth_array_from_roms_dataset(dset)
-        s_rho = 0.5 * np.arange(depth_array.shape[0]) - 0.5
-        return VertCRS.from_array(depth_array, s_rho)
+    def from_roms(dset, z_coord=None):
+        if z_coord is None or z_coord == 'index':
+            depth_array = create_depth_array_from_roms_dataset(dset)
+            z_index = 0.5 * np.arange(depth_array.shape[0]) - 0.5
+            return VertCRS.from_array(depth_array, z_index)
+        elif z_coord == 'S-coord':
+            depth_array = create_depth_array_from_roms_dataset(dset)
+            s_coord = np.linspace(-1, 0, depth_array.shape[0])
+            return VertCRS.from_array(depth_array, s_coord)
+        else:
+            raise ValueError(f'Unexpected z_coord: {z_coord}')
 
 
 class ArrayVertCRS(VertCRS):
@@ -326,9 +375,11 @@ class ArrayVertCRS(VertCRS):
         return np.interp(z, self._zcoord, kcoord)
 
     def _get_z_from_k(self, k):
+        from scipy.ndimage import map_coordinates
         return map_coordinates(self._zcoord, [k], order=1, mode='nearest')
 
     def _get_depth_from_xyk(self, x, y, k):
+        from scipy.ndimage import map_coordinates
         return map_coordinates(self._depth, [k, y, x], order=1)
 
     def depth(self, x, y, z, t):
@@ -343,6 +394,7 @@ class ArrayVertCRS(VertCRS):
         yy = np.broadcast_to(y.ravel(), shape)
         kk = np.broadcast_to(np.arange(kmax)[:, np.newaxis], shape)
 
+        from scipy.ndimage import map_coordinates
         d = map_coordinates(self._depth, [kk, yy, xx], order=1)
         k_int = np.less(d, depth).sum(axis=0)
         k_int = np.maximum(np.minimum(k_int, kmax - 1), 1)
@@ -375,6 +427,17 @@ class PlainVertCRS(VertCRS):
         return depth
 
 
+class NegativePlainVertCRS(VertCRS):
+    def __init__(self):
+        super().__init__()
+
+    def depth(self, x, y, z, t):
+        return -z
+
+    def z(self, x, y, depth, t):
+        return -depth
+
+
 class FourDimCRS:
     def __init__(self, horz_crs: HorzCRS, vert_crs: VertCRS, time_crs: TimeCRS):
         self.horz_crs = horz_crs
@@ -388,9 +451,17 @@ class FourDimCRS:
         self.latlon = self.horz_crs.latlon
 
     @staticmethod
-    def from_roms_grid(fname_or_dset):
+    def from_roms_grid(fname_or_dset, z_coord=None, t_coord=None):
         with open_file_or_dset(fname_or_dset) as dset:
-            return fourdim_crs_from_roms_grid(dset)
+            return fourdim_crs_from_roms_grid(dset, z_coord=z_coord, t_coord=t_coord)
+
+
+def fourdim_crs_from_roms_grid(dset, z_coord=None, t_coord=None):
+    horz_crs = HorzCRS.from_roms(dset)
+    vert_crs = VertCRS.from_roms(dset, z_coord=z_coord)
+    time_crs = TimeCRS.from_roms(dset, t_coord=t_coord)
+
+    return FourDimCRS(horz_crs, vert_crs, time_crs)
 
 
 def create_depth_array_from_roms_dataset(dset):
@@ -449,19 +520,65 @@ class FourDimTransform:
         return x2, y2, z2, t2
 
     @staticmethod
-    def from_roms_grid(file_or_dset):
-        with open_file_or_dset(file_or_dset) as dset:
-            fourdim_crs_from_roms_grid(dset)
+    def from_roms(dset, xy_coords='index', z_coords='index', t_coords='index'):
+        """
+        Return a four dimensional transform onto a roms grid
 
+        :param dset: A ROMS dataset (xarray.Dataset)
 
-def fourdim_crs_from_roms_grid(dset):
-    horz_crs = HorzCRS.from_roms(dset)
-    vert_crs = VertCRS.from_roms(dset)
+        :param xy_coords: ('index' or 'lonlat') Horizontal input coordinate system.
+        - 'index': Use 'eta_rho' and 'xi_rho' as input coordinates. For instance, x = 0
+        means xi_rho = 0 and xi_u = -0.5, while x = 0.5 means xi_rho = 0.5 and xi_u = 0.
+        - 'lonlat': Use longitude and latitude as input coordinates. For instance, y = 60
+        means a latitude of 60 degrees north, while x = -5 means a longitude of 5 degrees
+        west. Conversion between lat/lon and grid coordinates is done using linear
+        interpolation of the lat_rho and lon_rho arrays.
 
-    np_times = dset.ocean_time.values
-    time_crs = TimeCRS.from_array(np_times, np.arange(len(np_times)))
+        :param z_coords: ('index', 'depth' or 'S-coord') Vertical input coordinate system.
+        - 'index': Use 's_rho' as input coordinate. For instance, z = 0 means s_rho = 0
+        and s_w = 0.5, while z = -0.5 means s_rho = -0.5 and s_w = 0.
+        - 'depth': Use meters below surface as input coordinate. For instance, if the
+        total depth is 100, then z = 100 means s_rho = -0.5 and s_w = 0.
 
-    return FourDimCRS(horz_crs, vert_crs, time_crs)
+        :param t_coords: ('index', 'posix' or 'numpy') Time input coordinate system.
+        - 'index': Use the index of 'ocean_time' as input coordinate. For instance, t = 0
+        means the first time index and t = 0.5 means the value halfway between the first
+        and second time indices.
+        - 'posix': Use the number of seconds since 1970-01-01 (disregarding leap seconds)
+        as input coordinate. For instance, t = 3600 is the date 1970-01-01T01.
+        - 'numpy': Use numpy dates as input coordinates.
+
+        :return: A FourDimTransform object representing the transform from input
+        coordinates to ROMS grid coordinates.
+        """
+        roms_crs = FourDimCRS.from_roms_grid(dset)
+
+        if xy_coords == 'index':
+            input_horz_crs = roms_crs.horz_crs
+        elif xy_coords == 'lonlat':
+            input_horz_crs = LonLatHorzCRS()
+        else:
+            raise ValueError(f'Unexpected value of xy_coords: {xy_coords}')
+
+        if z_coords == 'index':
+            input_vert_crs = roms_crs.vert_crs
+        elif z_coords == 'depth':
+            input_vert_crs = NegativePlainVertCRS()
+        else:
+            raise ValueError(f'Unexpected value of z_coords: {z_coords}')
+
+        if t_coords == 'index':
+            input_time_crs = roms_crs.time_crs
+        elif t_coords == 'posix':
+            input_time_crs = PlainTimeCRS()
+        elif t_coords == 'numpy':
+            input_time_crs = NumpyTimeCRS()
+        else:
+            raise ValueError(f'Unexpected value of t_coords: {t_coords}')
+
+        input_crs = FourDimCRS(input_horz_crs, input_vert_crs, input_time_crs)
+
+        return FourDimTransform(input_crs, roms_crs)
 
 
 @contextmanager
