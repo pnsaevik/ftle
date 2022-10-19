@@ -3,6 +3,15 @@ import xarray as xr
 
 
 class Fields:
+    """
+    A set of named, four-dimensional fields.
+
+    A four-dimensional field is simply a function fn(t, z, y, x) which accepts numpy
+    arrays as its input and returns an xarray.DataArray as its output.
+
+    To generate fields from linear interpolation of gridded datasets, use the
+    *from_dataset* or the *from_roms_dataset* function.
+    """
     def __init__(self, funcdict):
         self._funcdict = dict()
         for k in funcdict:
