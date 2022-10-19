@@ -328,3 +328,23 @@ class Test_get_interp_func_from_xr_data_array:
         assert coords_2['y'].values.tolist() == y.tolist()
         assert coords_2['z'].values.tolist() == z.tolist()
         assert coords_2['t'].values.tolist() == t.tolist()
+
+
+class Test_data_vars_without_coords:
+    def test_removes_coords_when_only_coords_dataset(self):
+        dset = xr.Dataset(coords=dict(x=[1, 2, 3]))
+        data_vars = fields.data_vars_without_coords(dset)
+        assert data_vars['x'].values.tolist() == [1, 2, 3]
+        assert data_vars['x'].coords == {}
+
+    def test_removes_coords_when_datavars_coords_mixture_dataset(self):
+        dset = xr.Dataset(
+            data_vars=dict(data=xr.Variable(dims='x', data=[10, 20, 30])),
+            coords=dict(x=[1, 2, 3])
+        )
+        data_vars = fields.data_vars_without_coords(dset)
+        assert data_vars['x'].values.tolist() == [1, 2, 3]
+        assert data_vars['x'].coords == {}
+        assert data_vars['data'].values.tolist() == [10, 20, 30]
+        assert data_vars['data'].coords == {}
+
