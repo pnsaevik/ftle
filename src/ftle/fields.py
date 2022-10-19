@@ -129,7 +129,14 @@ def data_vars_without_coords(dset):
     xarray.DataArray objects.
     """
     import xarray as xr
-    data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
+
+    def drop_all_coords(darr: xr.DataArray):
+        crdnames = list(darr.coords.keys())
+        return darr.drop_vars(crdnames)
+
+    varnames = list(dset.variables.keys())
+
+    data_vars = {k: drop_all_coords(dset[k]) for k in varnames}
     return data_vars
 
 
