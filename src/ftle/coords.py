@@ -1,11 +1,9 @@
-import cftime
-import pyproj
-from scipy.ndimage import map_coordinates
-import numpy as np
 from contextlib import contextmanager
+import numpy as np
 
 
 def named_crs(name):
+    import pyproj
     proj_strings = dict(
         svim="+proj=stere +R=6371000.0 +lat_0=90 +lat_ts=60 +lon_0=58 +x_0=3988000 +y_0=2548000 +to_meter=4000",
         nk800="+proj=stere +lat_0=90 +lat_ts=60 +lon_0=70 +x_0=3192800 +y_0=1784000 +ellps=WGS84 +to_meter=800",
@@ -154,6 +152,7 @@ class ArrayHorzCRS(HorzCRS):
         self.lon = lon
 
     def latlon(self, x, y, z, t):
+        from scipy.ndimage import map_coordinates
         lat = map_coordinates(self.lat, [y, x], order=1)
         lon = map_coordinates(self.lon, [y, x], order=1)
         return lat, lon
@@ -170,6 +169,7 @@ class PyprojHorzCRS(HorzCRS):
         self._latlon_transform = None
 
     def _get_latlon_transform(self):
+        import pyproj
         if self._latlon_transform is None:
             wgs84 = pyproj.CRS.from_epsg(4326)
             self._latlon_transform = pyproj.Transformer.from_crs(self.crs, wgs84)
@@ -295,6 +295,7 @@ class CFTimeCRS(TimeCRS):
         return numpy_to_posix(npdates)
 
     def t(self, x, y, z, posix):
+        import cftime
         pydates = posix_to_numpy(posix).astype(object)
         return cftime.date2num(dates=pydates, units=self.units, calendar=self.calendar)
 
@@ -374,9 +375,11 @@ class ArrayVertCRS(VertCRS):
         return np.interp(z, self._zcoord, kcoord)
 
     def _get_z_from_k(self, k):
+        from scipy.ndimage import map_coordinates
         return map_coordinates(self._zcoord, [k], order=1, mode='nearest')
 
     def _get_depth_from_xyk(self, x, y, k):
+        from scipy.ndimage import map_coordinates
         return map_coordinates(self._depth, [k, y, x], order=1)
 
     def depth(self, x, y, z, t):
@@ -391,6 +394,7 @@ class ArrayVertCRS(VertCRS):
         yy = np.broadcast_to(y.ravel(), shape)
         kk = np.broadcast_to(np.arange(kmax)[:, np.newaxis], shape)
 
+        from scipy.ndimage import map_coordinates
         d = map_coordinates(self._depth, [kk, yy, xx], order=1)
         k_int = np.less(d, depth).sum(axis=0)
         k_int = np.maximum(np.minimum(k_int, kmax - 1), 1)

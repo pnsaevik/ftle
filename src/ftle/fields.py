@@ -1,5 +1,4 @@
 import numpy as np
-import xarray as xr
 
 
 class Fields:
@@ -99,6 +98,7 @@ def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index
     nearests = dict(u={'y'}, v={'x'})
 
     # Strip variables of coordinates to facilitate index-based interpolation
+    import xarray as xr
     data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
 
     # Create four-dimensional transform object
@@ -156,6 +156,7 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
         darr = darr.rename(mapping)
 
     def mkvar(np_arr):
+        import xarray as xr
         return xr.Variable('pid', np_arr)
 
     def shift(coords_in):
@@ -163,6 +164,8 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
         return {k: v + offset[k] if k in offset else v for k, v in coords_in.items()}
 
     def fn(x, y, z, t):
+        import xarray as xr
+
         if transform is not None:
             x, y, z, t = transform(xx=x, yy=y, zz=z, tt=t)
 
@@ -186,6 +189,7 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
         return darr_interp
 
     def fn_singledim(x, y, z, t):
+        import xarray as xr
         v = next(vv for vv in (x, y, z, t) if vv.shape != ())
         return xr.broadcast(darr, xr.DataArray(mkvar(v)))[0]
 
