@@ -98,8 +98,7 @@ def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index
     nearests = dict(u={'y'}, v={'x'})
 
     # Strip variables of coordinates to facilitate index-based interpolation
-    import xarray as xr
-    data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
+    data_vars = data_vars_without_coords(dset)
 
     # Create four-dimensional transform object
     from .coords import FourDimTransform
@@ -119,6 +118,19 @@ def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index
         funcdict[k] = fn
 
     return Fields(funcdict)
+
+
+def data_vars_without_coords(dset):
+    """
+    Return a dict of all variables in the dataset, as xarray.DataArray objects, with
+    all the coordinates removed.
+    :param dset: An xarray.Dataset object
+    :return: A dict where the keys are the variable names and the values are
+    xarray.DataArray objects.
+    """
+    import xarray as xr
+    data_vars = {k: xr.DataArray(v, coords={}) for k, v in dset.variables.items()}
+    return data_vars
 
 
 def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=(), transform=None):
