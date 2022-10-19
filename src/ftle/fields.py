@@ -6,7 +6,7 @@ class Fields:
     """
     A set of named, four-dimensional fields.
 
-    A four-dimensional field is simply a function fn(t, z, y, x) which accepts numpy
+    A four-dimensional field is simply a function fn(x, y, z, t) which accepts numpy
     arrays as its input and returns an xarray.DataArray as its output.
 
     To generate fields from linear interpolation of gridded datasets, use the
@@ -121,14 +121,6 @@ def from_roms_dataset(dset, xy_coords='index', z_coords='index', t_coords='index
     return Fields(funcdict)
 
 
-def _get_vtrans_function(func, vtrans):
-    def fn(t, z, y, x):
-        new_z = vtrans.z(x, y, -z, t)
-        return func(t, new_z, y, x)
-
-    return fn
-
-
 def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=(), transform=None):
     """
     Create 4D interpolation function from grid variables
@@ -144,20 +136,20 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
     a zero-based range index is implied. For instance, fn(0, 0, 0, 0) should return
     the first element of `darr` if the array has no coordinates.
 
-    :param mapping: Mapping from `darr` dimension names to ('t', 'z', 'y', 'x')
+    :param mapping: Mapping from `darr` dimension names to ('x', 'y', 'z', 't')
 
     :param offset: A mapping of offset values. Offset values are added to the coordinates
     before interpolation. For instance, fn(100, 0, 0, 0) returns the first element of
     `darr` if there are no coordinates and offset = {'t': -100}.
 
-    :param nearest: A subset of {'t', 'z', 'y', 'x'}. Specifies dimensions which should
+    :param nearest: A subset of {'z', 'y', 'z', 't'}. Specifies dimensions which should
     be interpolated using the `nearest` algorithm.
 
     :param transform: A transform function fn(xx, yy, zz, tt) which returns a tuple
     (x2, y2, z2, t2). The transform is applied to the input coordinates before
     interpolation.
 
-    :return: A function fn(t, z, y, x) which samples the array value at fractional
+    :return: A function fn(x, y, z, t) which samples the array value at fractional
     coordinates.
     """
     if mapping is not None:
@@ -170,7 +162,7 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
         """Shift coordinates by the specified offset if it exists"""
         return {k: v + offset[k] if k in offset else v for k, v in coords_in.items()}
 
-    def fn(t, z, y, x):
+    def fn(x, y, z, t):
         if transform is not None:
             x, y, z, t = transform(xx=x, yy=y, zz=z, tt=t)
 
@@ -193,8 +185,8 @@ def get_interp_func_from_xr_data_array(darr, mapping=None, offset=None, nearest=
 
         return darr_interp
 
-    def fn_singledim(t, z, y, x):
-        v = next(vv for vv in (t, z, y, x) if vv.shape != ())
+    def fn_singledim(x, y, z, t):
+        v = next(vv for vv in (x, y, z, t) if vv.shape != ())
         return xr.broadcast(darr, xr.DataArray(mkvar(v)))[0]
 
     # If input array is a datetime, we must convert it to a number so that interpolation works
