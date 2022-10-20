@@ -46,7 +46,7 @@ class Test_bilin_inv:
         assert i2.tolist() == i.tolist()
 
 
-class Test_HorzCRS_from_roms:
+class Test_HorzCRS_from_cf:
     @pytest.fixture(scope='class')
     def dset(self):
         return xr.Dataset(
@@ -61,16 +61,46 @@ class Test_HorzCRS_from_roms:
                     data=[[55.90836992991222, 55.914515183957455, 55.92066026686482],
                           [55.91180312636388, 55.917949145372780, 55.92409499347620]],
                 ),
+                crs=xr.Variable(
+                    dims=(),
+                    data=0,
+                    attrs={
+                        'long_name': 'grid mapping',
+                        'straight_vertical_longitude_from_pole': 70,
+                        'false_easting': 3192800,
+                        'standard_parallel': 60.0,
+                        'semi_major_axis': 6378137.0,
+                        'false_northing': 1784000,
+                        'grid_mapping_name': 'polar_stereographic',
+                        'inverse_flattening': 298.257223563,
+                        'latitude_of_projection_origin': 90.0,
+                        'ellipsoid': 'WGS84',
+                        'dx': 800,
+                        'proj4string': '+proj=stere +ellps=WGS84 +lat_0=90.0 +lat_ts=60.0 +x_0=3192800 +y_0=1784000 +lon_0=70',
+                    },
+                ),
+            ),
+            coords=dict(
+                xi_rho=xr.Variable(
+                    dims='xi_rho',
+                    data=[800, 800, 800],
+                    attrs=dict(standard_name='projection_x_coordinate'),
+                ),
+                eta_rho=xr.Variable(
+                    dims='eta_rho',
+                    data=[800, 800],
+                    attrs=dict(standard_name='projection_y_coordinate'),
+                ),
             ),
         )
 
-    def test_returns_array_based_crs_when_default_coords(self, dset):
-        crs = coords.HorzCRS.from_roms(dset)
+    def test_can_return_projection_based_crs(self, dset):
+        crs = coords.HorzCRS.from_cf(dset)
         x = np.array([0, 0, 1])
         y = np.array([0, 1, 1])
         lat, lon = crs.latlon(x, y, None, None)
-        assert lat.tolist() == dset.lat_rho.values[y, x].tolist()
-        assert lon.tolist() == dset.lon_rho.values[y, x].tolist()
+        assert lat.round(3).tolist() == dset.lat_rho.values[y, x].round(3).tolist()
+        assert lon.round(3).tolist() == dset.lon_rho.values[y, x].round(3).tolist()
 
 
 class Test_ArrayHorzCRS:
