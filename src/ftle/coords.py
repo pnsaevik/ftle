@@ -109,6 +109,26 @@ class HorzCRS:
         return ArrayHorzCRS(lat, lon)
 
     @staticmethod
+    def from_cf(dset):
+        import pyproj
+        crs_var = next(v for v in dset if 'grid_mapping_name' in dset[v].attrs)
+        crs = pyproj.CRS.from_cf(dset[crs_var].attrs)
+
+        std_names = {dset[k].attrs.get('standard_name', ''): k for k in dset.coords}
+        try:
+            x_var = std_names['projection_x_coordinate']
+            y_var = std_names['projection_y_coordinate']
+        except KeyError:
+            raise ValueError(f'x and y variables must be identifiable by a "standard_name" attribute')
+
+        scale_values = np.concatenate([dset[x_var].values, dset[y_var].values])
+        unq_scale_values = np.unique(scale_values)
+        if not len(unq_scale_values) == 1:
+            raise ValueError('scale values of x and y variables must be unique')
+
+        return ScaledPyprojHorzCRS(crs, unq_scale_values[0])
+
+    @staticmethod
     def from_roms(dset):
         return HorzCRS.from_array(dset.lat_rho.values, dset.lon_rho.values)
 
@@ -183,6 +203,19 @@ class PyprojHorzCRS(HorzCRS):
     def latlon(self, x, y, z, t):
         transform = self._get_latlon_transform().transform
         return transform(x, y)
+
+
+class ScaledPyprojHorzCRS(PyprojHorzCRS):
+    def __init__(self, crs, scale):
+        super().__init__(crs)
+        self.scale = scale
+
+    def xy(self, lat, lon, z, t):
+        x, y = super().xy(lat, lon, z, t)
+        return x / self.scale, y / self.scale
+
+    def latlon(self, x, y, z, t):
+        return super().latlon(x * self.scale, y * self.scale, z, t)
 
 
 class TimeCRS:

@@ -347,4 +347,3 @@ class Test_data_vars_without_coords:
         assert data_vars['x'].coords == {}
         assert data_vars['data'].values.tolist() == [10, 20, 30]
         assert data_vars['data'].coords == {}
-

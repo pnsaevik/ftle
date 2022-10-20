@@ -46,6 +46,63 @@ class Test_bilin_inv:
         assert i2.tolist() == i.tolist()
 
 
+class Test_HorzCRS_from_cf:
+    @pytest.fixture(scope='class')
+    def dset(self):
+        return xr.Dataset(
+            data_vars=dict(
+                lon_rho=xr.Variable(
+                    dims=('eta_rho', 'xi_rho'),
+                    data=[[9.194590109686665, 9.200704367664919, 9.206820961406246],
+                          [9.183648429331841, 9.189761249844107, 9.195876406068914]],
+                ),
+                lat_rho=xr.Variable(
+                    dims=('eta_rho', 'xi_rho'),
+                    data=[[55.90836992991222, 55.914515183957455, 55.92066026686482],
+                          [55.91180312636388, 55.917949145372780, 55.92409499347620]],
+                ),
+                crs=xr.Variable(
+                    dims=(),
+                    data=0,
+                    attrs={
+                        'long_name': 'grid mapping',
+                        'straight_vertical_longitude_from_pole': 70,
+                        'false_easting': 3192800,
+                        'standard_parallel': 60.0,
+                        'semi_major_axis': 6378137.0,
+                        'false_northing': 1784000,
+                        'grid_mapping_name': 'polar_stereographic',
+                        'inverse_flattening': 298.257223563,
+                        'latitude_of_projection_origin': 90.0,
+                        'ellipsoid': 'WGS84',
+                        'dx': 800,
+                        'proj4string': '+proj=stere +ellps=WGS84 +lat_0=90.0 +lat_ts=60.0 +x_0=3192800 +y_0=1784000 +lon_0=70',
+                    },
+                ),
+            ),
+            coords=dict(
+                xi_rho=xr.Variable(
+                    dims='xi_rho',
+                    data=[800, 800, 800],
+                    attrs=dict(standard_name='projection_x_coordinate'),
+                ),
+                eta_rho=xr.Variable(
+                    dims='eta_rho',
+                    data=[800, 800],
+                    attrs=dict(standard_name='projection_y_coordinate'),
+                ),
+            ),
+        )
+
+    def test_can_return_projection_based_crs(self, dset):
+        crs = coords.HorzCRS.from_cf(dset)
+        x = np.array([0, 0, 1])
+        y = np.array([0, 1, 1])
+        lat, lon = crs.latlon(x, y, None, None)
+        assert lat.round(3).tolist() == dset.lat_rho.values[y, x].round(3).tolist()
+        assert lon.round(3).tolist() == dset.lon_rho.values[y, x].round(3).tolist()
+
+
 class Test_ArrayHorzCRS:
     def test_can_return_latlon(self):
         y, x = np.meshgrid(np.arange(4), np.arange(5), indexing='ij')
@@ -306,9 +363,6 @@ class Test_FourDimTransform_from_roms:
         assert t2.tolist() == t.tolist()
 
     def test_can_specify_numpy_input_coordinates(self, dset):
-        epoch = np.datetime64('1970-01-01')
-        one_sec = np.timedelta64(1, 's')
-
         x, y, z = np.zeros((3, 3))
         t = np.array([0, 1, 2])
         nptimes = dset.ocean_time.values[t]
