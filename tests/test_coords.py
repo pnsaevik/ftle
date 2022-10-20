@@ -46,6 +46,33 @@ class Test_bilin_inv:
         assert i2.tolist() == i.tolist()
 
 
+class Test_HorzCRS_from_roms:
+    @pytest.fixture(scope='class')
+    def dset(self):
+        return xr.Dataset(
+            data_vars=dict(
+                lon_rho=xr.Variable(
+                    dims=('eta_rho', 'xi_rho'),
+                    data=[[9.194590109686665, 9.200704367664919, 9.206820961406246],
+                          [9.183648429331841, 9.189761249844107, 9.195876406068914]],
+                ),
+                lat_rho=xr.Variable(
+                    dims=('eta_rho', 'xi_rho'),
+                    data=[[55.90836992991222, 55.914515183957455, 55.92066026686482],
+                          [55.91180312636388, 55.917949145372780, 55.92409499347620]],
+                ),
+            ),
+        )
+
+    def test_returns_array_based_crs_when_default_coords(self, dset):
+        crs = coords.HorzCRS.from_roms(dset)
+        x = np.array([0, 0, 1])
+        y = np.array([0, 1, 1])
+        lat, lon = crs.latlon(x, y, None, None)
+        assert lat.tolist() == dset.lat_rho.values[y, x].tolist()
+        assert lon.tolist() == dset.lon_rho.values[y, x].tolist()
+
+
 class Test_ArrayHorzCRS:
     def test_can_return_latlon(self):
         y, x = np.meshgrid(np.arange(4), np.arange(5), indexing='ij')
@@ -306,9 +333,6 @@ class Test_FourDimTransform_from_roms:
         assert t2.tolist() == t.tolist()
 
     def test_can_specify_numpy_input_coordinates(self, dset):
-        epoch = np.datetime64('1970-01-01')
-        one_sec = np.timedelta64(1, 's')
-
         x, y, z = np.zeros((3, 3))
         t = np.array([0, 1, 2])
         nptimes = dset.ocean_time.values[t]
